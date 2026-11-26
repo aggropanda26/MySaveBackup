@@ -2,6 +2,7 @@ import os
 os.environ.setdefault('QT_QPA_PLATFORM','offscreen')
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QEventLoop, QTimer, Qt
@@ -25,4 +26,30 @@ class GuiTests(unittest.TestCase):
             self.assertEqual(inspect_backup(window.last_backup)['errors'],[])
             self.assertIsNone(window.worker)
             self.assertEqual((source/'slot.sav').read_text(),'progress')
+            window.close()
+
+    def test_first_start_notice_dismissed_permanently(self):
+        with tempfile.TemporaryDirectory() as temp:
+            config=Path(temp)/'config'
+            window=Window(config_dir=config);window.show()
+            self.app.processEvents()
+            self.assertTrue(window.first_start_banner.isVisible())
+            self.assertTrue(window.dismiss_first_start_button.isEnabled())
+            self.assertTrue(window.scan_button.isEnabled())
+            window.dismiss_first_start_button.click()
+            self.assertFalse(window.first_start_banner.isVisible())
+            self.assertTrue((config/'first-start-dismissed').is_file())
+            window.close()
+            reopened=Window(config_dir=config);reopened.show()
+            self.app.processEvents()
+            self.assertFalse(reopened.first_start_banner.isVisible())
+            reopened.close()
+
+    def test_notice_closes_even_if_config_cannot_be_written(self):
+        with tempfile.TemporaryDirectory() as temp:
+            window=Window(config_dir=Path(temp)/'config');window.show()
+            with patch.object(Path, 'touch', side_effect=PermissionError('read-only')):
+                window.dismiss_first_start_button.click()
+            self.assertFalse(window.first_start_banner.isVisible())
+            self.assertTrue(window.scan_button.isEnabled())
             window.close()

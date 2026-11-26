@@ -23,18 +23,28 @@ class Worker(QThread):
             self.failed.emit(str(exc))
 
 class Window(QMainWindow):
-    def __init__(self):
+    def __init__(self, config_dir=None):
         super().__init__()
         self.setWindowTitle('MySaveBackup · Spielstände sichern')
         self.resize(1080, 760)
         self.games = []; self.worker = None; self.last_backup = None
-        self.config = Path.home()/'.config/mysavebackup'
+        self.config = Path(config_dir) if config_dir is not None else Path.home()/'.config/mysavebackup'
+        self.first_start_marker = self.config/'first-start-dismissed'
         self.manual_file = self.config/'manual-sources.json'
         self.mode = ''
         body = QWidget(); self.setCentralWidget(body); layout = QVBoxLayout(body)
         title = QLabel('MySaveBackup'); title.setStyleSheet('font-size: 28px; font-weight: 700;')
         layout.addWidget(title)
         layout.addWidget(QLabel('Spielstände sichern. Kopien prüfen. Originale behalten.'))
+        self.first_start_banner = QWidget()
+        banner_layout = QHBoxLayout(self.first_start_banner)
+        banner_layout.addWidget(QLabel('Sorry nur Ki Slop'))
+        banner_layout.addStretch()
+        self.dismiss_first_start_button = QPushButton('Schließen')
+        self.dismiss_first_start_button.clicked.connect(self.dismiss_first_start)
+        banner_layout.addWidget(self.dismiss_first_start_button)
+        self.first_start_banner.setVisible(not self.first_start_marker.exists())
+        layout.addWidget(self.first_start_banner)
         bar = QHBoxLayout(); layout.addLayout(bar)
         self.scan_button = QPushButton('Spiele suchen'); self.scan_button.clicked.connect(self.scan); bar.addWidget(self.scan_button)
         self.manual_button = QPushButton('Spielstandordner hinzufügen'); self.manual_button.clicked.connect(self.add_manual); bar.addWidget(self.manual_button)
@@ -57,6 +67,15 @@ class Window(QMainWindow):
         self.log = QPlainTextEdit(); self.log.setReadOnly(True); self.log.setMaximumHeight(165); layout.addWidget(self.log)
         footer = QLabel('Version 0.1 · Originale werden nur gelesen. Duplikatprüfung zeigt eine Vorschau und löscht nichts.')
         footer.setWordWrap(True); layout.addWidget(footer)
+
+    def dismiss_first_start(self):
+        # Dismiss immediately, even if remembering the choice fails.
+        self.first_start_banner.hide()
+        try:
+            self.config.mkdir(parents=True, exist_ok=True)
+            self.first_start_marker.touch(exist_ok=True)
+        except OSError:
+            self.log.appendPlainText('Der Hinweis wurde geschlossen, konnte aber nicht dauerhaft ausgeblendet werden.')
 
     def busy(self, value):
         for widget in (self.scan_button,self.manual_button,self.backup_button,self.verify_button,self.browse_button,self.destination,self.tree):

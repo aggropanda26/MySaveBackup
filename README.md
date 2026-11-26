@@ -42,6 +42,8 @@ Beim ersten Start entsteht eine lokale Python-Umgebung in `.venv`. Auf diesem Re
 
 Während eines Vorgangs kann das Fenster erst nach Abschluss geschlossen werden. Spiele möglichst vor dem Sichern beenden. Änderungen während des Kopierens werden als Fehler gemeldet; ein konsistenter Snapshot eines laufenden Spiels ist nicht garantiert.
 
+Beim ersten Start erscheint „Sorry nur Ki Slop“. Die Einblendung lässt sich sofort über **Schließen** entfernen und blockiert keine Funktionen. Nach dem Schließen erscheint sie für diesen Benutzer nicht erneut; die Auswahl liegt unter `~/.config/mysavebackup/first-start-dismissed`.
+
 ## Was schon funktioniert
 
 - Steam-Bibliotheken, einschließlich zusätzlicher Laufwerke und Flatpak, lesen.
@@ -87,6 +89,10 @@ Qt-Referenz für die verwendeten Hintergrundaufgaben: https://doc.qt.io/qtforpyt
 ```text
 MySaveBackup – Änderungsverlauf
 Neueste Änderungen zuerst. Datumsangaben: Europe/Vienna.
+
+2026-11-26 – Hinweis beim ersten Start
+- Sofort schließbare Einblendung „Sorry nur Ki Slop“ ergänzt, ohne Wartezeit oder Sperre der Oberfläche.
+- Nach dem Schließen wird der Hinweis für diesen Benutzer dauerhaft ausgeblendet, auch nach App-Updates.
 
 2026-11-26 – Hinweis zur Erstellung
 - README um den Hinweis „Die App wurde mit KI erstellt.“ ergänzt.
