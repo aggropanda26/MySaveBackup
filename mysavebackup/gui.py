@@ -29,6 +29,9 @@ class Window(QMainWindow):
     def __init__(self, config_dir=None):
         super().__init__()
         self.setWindowTitle('MySaveBackup · Spielstände sichern')
+        icon_path = PROJECT/'assets/icon.png'
+        if not icon_path.is_file(): icon_path = PROJECT/'icon.png'
+        self.setWindowIcon(QIcon(str(icon_path)))
         self.resize(1080, 760)
         self.games = []; self.worker = None; self.last_backup = None
         self.config = Path(config_dir) if config_dir is not None else Path.home()/'.config/mysavebackup'
@@ -309,4 +312,5 @@ class Window(QMainWindow):
 
 def main():
     app=QApplication([]); app.setApplicationName('MySaveBackup')
-    window=Window(); window.show(); app.exec()
+    app.setDesktopFileName('mysavebackup')
+    window=Window(); app.setWindowIcon(window.windowIcon()); window.show(); app.exec()

@@ -1,5 +1,7 @@
 # MySaveBackup
 
+<img src="assets/icon.png" alt="MySaveBackup Neon-Panda-Icon" width="160">
+
 Die App wurde mit KI erstellt.
 
 Eine erste Desktop-App für Spielstand-Backups unter Arch Linux. Python erledigt die Dateiarbeit, PySide6 stellt die Oberfläche bereit.
@@ -99,6 +101,10 @@ Qt-Referenz für die verwendeten Hintergrundaufgaben: https://doc.qt.io/qtforpyt
 ```text
 MySaveBackup – Änderungsverlauf
 Neueste Änderungen zuerst. Datumsangaben: Europe/Vienna.
+
+2026-11-26 – Neues App-Icon
+- Vom Nutzer bereitgestelltes Neon-Panda-Bild als PNG-App-Icon übernommen.
+- Menüeintrag und Programmfenster verwenden das neue Icon; der Installer liefert es bei Updates mit.
 
 2026-11-26 – Spielcover
 - Spieleliste um Cover erweitert, die automatisch im Hintergrund von Steams Bildservern geladen werden (derselben Bildquelle wie bei SteamDB).

@@ -21,6 +21,8 @@ class InstallerTests(unittest.TestCase):
             app=installer.install(source,home)
             binary=home/'.local/bin/mysavebackup';desktop=home/'.local/share/applications/mysavebackup.desktop'
             self.assertTrue(os.access(binary,os.X_OK))
+            self.assertEqual((app/'icon.png').read_bytes(), (source/'assets/icon.png').read_bytes())
+            self.assertIn('Icon='+str(app/'icon.png'), desktop.read_text())
             subprocess.run(['bash','-n',str(binary)],check=True)
             if shutil.which('desktop-file-validate'):
                 subprocess.run(['desktop-file-validate',str(desktop)],check=True)
