@@ -1,5 +1,7 @@
 # MySaveBackup
 
+Die App wurde mit KI erstellt.
+
 Eine erste Desktop-App für Spielstand-Backups unter Arch Linux. Python erledigt die Dateiarbeit, PySide6 stellt die Oberfläche bereit.
 
 ## Für deinen Benutzer installieren
@@ -85,6 +87,9 @@ Qt-Referenz für die verwendeten Hintergrundaufgaben: https://doc.qt.io/qtforpyt
 ```text
 MySaveBackup – Änderungsverlauf
 Neueste Änderungen zuerst. Datumsangaben: Europe/Vienna.
+
+2026-11-26 – Hinweis zur Erstellung
+- README um den Hinweis „Die App wurde mit KI erstellt.“ ergänzt.
 
 2026-11-26 – Änderungsverlauf
 - CHANGELOG.txt als gemeinsame Quelle für den Änderungsverlauf ergänzt.
