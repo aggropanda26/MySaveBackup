@@ -11,26 +11,20 @@ Eine erste Desktop-App für Spielstand-Backups unter Arch Linux. Python erledigt
 Einmalig die benötigten Pakete installieren:
 
 ```bash
-sudo pacman -S --needed git github-cli python python-pyside6
+sudo pacman -S --needed git python python-pyside6
 ```
 
-Das Repository ist privat. Melde dich einmalig mit einem GitHub-Konto an, das Zugriff auf `aggropanda26/MySaveBackup` hat:
-
-```bash
-gh auth login --hostname github.com --git-protocol https --web
-```
+Das Repository ist öffentlich. Eine GitHub-Anmeldung und die GitHub CLI sind nicht erforderlich.
 
 Danach installiert dieser Befehl den aktuellen Stand von `main`. Derselbe Befehl aktualisiert eine vorhandene Installation; die App vorher schließen:
 
 ```bash
-bash -c 'set -e; msb_tmp=$(mktemp -d); cleanup() { rm -rf -- "$msb_tmp"; }; trap cleanup EXIT; gh repo clone https://github.com/aggropanda26/MySaveBackup.git "$msb_tmp/repo" -- --depth 1 --branch main; bash "$msb_tmp/repo/install.sh"'
+bash -c 'set -e; msb_tmp=$(mktemp -d); cleanup() { rm -rf -- "$msb_tmp"; }; trap cleanup EXIT; git clone --depth 1 --branch main https://github.com/aggropanda26/MySaveBackup.git "$msb_tmp/repo"; bash "$msb_tmp/repo/install.sh"'
 ```
 
 Der Befehl lädt das Repository in einen temporären Ordner, führt den vorhandenen Benutzer-Installer aus und entfernt danach nur diesen temporären Download. Die App erscheint im Anwendungsmenü und startet auch über `~/.local/bin/mysavebackup`. Einstellungen und vorhandene Backups bleiben erhalten. Spielstände und lokale Pfadlisten werden nicht aus GitHub geladen; auf einem neuen Rechner zuerst **Spiele suchen** verwenden und fehlende Ordner ergänzen.
 
-Nur die Paketinstallation benötigt sudo. Den Installationsbefehl selbst als normaler Benutzer ausführen. Ohne Repository-Zugriff bricht der Download ab, bevor der Installer startet. Ein öffentlicher Download ohne Anmeldung ist bei diesem privaten Repository nicht möglich.
-
-GitHub-Dokumentation: [Anmeldung](https://cli.github.com/manual/gh_auth_login) und [Repository klonen](https://cli.github.com/manual/gh_repo_clone).
+Nur die Paketinstallation benötigt sudo. Den Installationsbefehl selbst als normaler Benutzer ausführen. Schlägt der Download fehl, startet der Installer nicht.
 
 ## Für deinen Benutzer installieren
 
@@ -60,7 +54,7 @@ Im Projektordner ein Terminal öffnen und ausführen:
 ./start.sh
 ```
 
-Beim ersten Start entsteht eine lokale Python-Umgebung in `.venv`. Auf diesem Rechner ist PySide6 bereits vorhanden. Auf einem anderen Arch-Rechner werden `python` und `python-pyside6` benötigt. Es werden beim Start keine Pakete heruntergeladen.
+Beim ersten Start entsteht eine lokale Python-Umgebung in `.venv`. Dafür müssen `python` und `python-pyside6` installiert sein. Es werden beim Start keine Pakete heruntergeladen.
 
 1. **Spiele suchen** anklicken.
 2. Spiele aufklappen und gefundene Speicherorte prüfen. Ein einzelner Klick auf einen unterstrichenen Spielstandpfad öffnet dessen Ordner direkt im Dateimanager. Spiele ohne erkannte Dateien können über **Spielstandordner hinzufügen** ergänzt werden.
@@ -98,7 +92,7 @@ An den Bildserver wird nur die jeweilige App-ID im Bildpfad gesendet, keine Spie
 ## Was schon funktioniert
 
 - Steam-Bibliotheken, einschließlich zusätzlicher Laufwerke und Flatpak, lesen.
-- Bekannte Spielstandpfade aus unserer vorherigen Suche über `local_sources.json` einbeziehen.
+- Optionale lokale Spielstandpfade aus `local_sources.json` einbeziehen; diese Datei wird nicht im Repository mitgeliefert.
 - Weitere Spielstandordner manuell hinzufügen; gespeichert unter `~/.config/mysavebackup/manual-sources.json`.
 - Eigenständige Backup-Kopien pro Spiel und Speicherort erstellen.
 - SHA-256-Prüfsummen prüfen, Originalpfade im Manifest dokumentieren.
@@ -108,7 +102,7 @@ An den Bildserver wird nur die jeweilige App-ID im Bildpfad gesendet, keine Spie
 
 ## Grenzen dieser ersten Version
 
-Die automatische Suche erkennt noch nicht jedes Spiel oder jeden Launcher. Die mitgelieferte `local_sources.json` ist eine lokale Startkonfiguration für diesen Rechner, keine allgemeine Spieldatenbank. Nicht eindeutig bestimmbare Begleitdateien bleiben erhalten. Einige klar benannte Einstellungen, Protokolle und Steam-Verwaltungsdateien werden ausgelassen; registrybasierte Spielstände werden noch nicht unterstützt. Prüfe die angezeigten Quellen vor dem Backup.
+Die automatische Suche erkennt noch nicht jedes Spiel oder jeden Launcher. Eine optionale `local_sources.json` kann eigene Spielstandpfade ergänzen. Sie bleibt lokal und gehört nicht zum öffentlichen Repository; sie ist keine allgemeine Spieldatenbank. Nicht eindeutig bestimmbare Begleitdateien bleiben erhalten. Einige klar benannte Einstellungen, Protokolle und Steam-Verwaltungsdateien werden ausgelassen; registrybasierte Spielstände werden noch nicht unterstützt. Prüfe die angezeigten Quellen vor dem Backup.
 
 Symbolische Links innerhalb der Quellordner werden nicht verfolgt. Die Original-Verknüpfungen im Backup führen dagegen zu den echten Ordnern: Änderungen über den Dateimanager wirken dort auf die Originale.
 
@@ -142,6 +136,10 @@ Qt-Referenz für die verwendeten Hintergrundaufgaben: https://doc.qt.io/qtforpyt
 ```text
 MySaveBackup – Änderungsverlauf
 Neueste Änderungen zuerst. Datumsangaben: Europe/Vienna.
+
+2026-11-26 – Anleitung für das öffentliche Repository
+- Installation und Updates per git clone ohne GitHub-Anmeldung oder GitHub CLI beschrieben.
+- Rechnerbezogene Hinweise korrigiert und lokale Spielstandkonfiguration als optional und nicht mitgeliefert gekennzeichnet.
 
 2026-11-26 – Wiederherstellung und Rücknahme
 - Einzelne Spiele aus vollständigen MySaveBackup-Sicherungen wiederherstellen, mit Dateivorschau und ausdrücklicher Bestätigung.
