@@ -1,6 +1,6 @@
 # MySaveBackup
 
-<img src="assets/icon.png" alt="MySaveBackup Neon-Panda-Icon" width="160">
+<img src="assets/icon.png" alt="MySaveBackup Neon-Panda-Icon mit transparentem Hintergrund" width="160">
 
 Die App wurde mit KI erstellt.
 
@@ -101,6 +101,10 @@ Qt-Referenz für die verwendeten Hintergrundaufgaben: https://doc.qt.io/qtforpyt
 ```text
 MySaveBackup – Änderungsverlauf
 Neueste Änderungen zuerst. Datumsangaben: Europe/Vienna.
+
+2026-11-26 – Transparentes App-Icon
+- Schachbrett-Hintergrund der neuen Neon-Panda-Vorlage entfernt und durch echte PNG-Transparenz ersetzt.
+- Menü-, Fenster- und README-Icon auf die freigestellte Version aktualisiert.
 
 2026-11-26 – Neues App-Icon
 - Vom Nutzer bereitgestelltes Neon-Panda-Bild als PNG-App-Icon übernommen.
