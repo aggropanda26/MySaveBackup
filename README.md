@@ -1,2 +1,58 @@
 # MySaveBackup
-Spielstände finden und Backupen einfach gemacht
+
+Eine erste Desktop-App für Spielstand-Backups unter Arch Linux. Python erledigt die Dateiarbeit, PySide6 stellt die Oberfläche bereit.
+
+## Starten
+
+Im Projektordner ein Terminal öffnen und ausführen:
+
+```bash
+./start.sh
+```
+
+Beim ersten Start entsteht eine lokale Python-Umgebung in `.venv`. Auf diesem Rechner ist PySide6 bereits vorhanden. Auf einem anderen Arch-Rechner werden `python` und `python-pyside6` benötigt. Es werden beim Start keine Pakete heruntergeladen.
+
+1. **Spiele suchen** anklicken.
+2. Spiele aufklappen und gefundene Speicherorte prüfen. Spiele ohne erkannte Dateien können über **Spielstandordner hinzufügen** ergänzt werden.
+3. Zielordner auswählen und **Ausgewählte Spiele sichern** anklicken. Die Auswahl bleibt beim Filtern bestehen.
+4. **Letztes Backup öffnen** öffnet die geprüfte Sicherung.
+5. **Backup und Duplikate prüfen** liest einen Sicherungsordner mit `manifest.json`. Diese erste Version zeigt Duplikate nur an und löscht nichts.
+
+Während eines Vorgangs kann das Fenster erst nach Abschluss geschlossen werden. Spiele möglichst vor dem Sichern beenden. Änderungen während des Kopierens werden als Fehler gemeldet; ein konsistenter Snapshot eines laufenden Spiels ist nicht garantiert.
+
+## Was schon funktioniert
+
+- Steam-Bibliotheken, einschließlich zusätzlicher Laufwerke und Flatpak, lesen.
+- Bekannte Spielstandpfade aus unserer vorherigen Suche über `local_sources.json` einbeziehen.
+- Weitere Spielstandordner manuell hinzufügen; gespeichert unter `~/.config/mysavebackup/manual-sources.json`.
+- Eigenständige Backup-Kopien pro Spiel und Speicherort erstellen.
+- SHA-256-Prüfsummen prüfen, Originalpfade im Manifest dokumentieren.
+- Originalordner-Verknüpfungen erstellen; Quellen beim Sichern nur lesen.
+- Byte-identische Duplikate innerhalb eines Spiels anzeigen.
+
+## Grenzen dieser ersten Version
+
+Die automatische Suche erkennt noch nicht jedes Spiel oder jeden Launcher. Die mitgelieferte `local_sources.json` ist eine lokale Startkonfiguration für diesen Rechner, keine allgemeine Spieldatenbank. Nicht eindeutig bestimmbare Begleitdateien bleiben erhalten. Einige klar benannte Einstellungen, Protokolle und Steam-Verwaltungsdateien werden ausgelassen; registrybasierte Spielstände werden noch nicht unterstützt. Prüfe die angezeigten Quellen vor dem Backup.
+
+Symbolische Links innerhalb der Quellordner werden nicht verfolgt. Die Original-Verknüpfungen im Backup führen dagegen zu den echten Ordnern: Änderungen über den Dateimanager wirken dort auf die Originale.
+
+Eine automatische Bereinigung und Wiederherstellung sind noch nicht eingebaut. Bei Fehlern bleibt eine als `incomplete` markierte Sicherung zur Diagnose erhalten. Nur `status: complete` bestätigt einen erfolgreichen Durchlauf. Backups auf derselben Festplatte schützen nicht vor deren Ausfall.
+
+## Projekt verstehen
+
+- `mysavebackup/gui.py`: Fenster, Schaltflächen, Hintergrundaufgaben.
+- `mysavebackup/core.py`: Suche, Kopieren, Prüfsummen und Duplikatprüfung; ohne Qt-Abhängigkeit.
+- `tests/test_core.py`: Tests mit künstlichen Spielständen, ohne Änderungen an echten Spielständen.
+- `local_sources.json`: lokale Spielnamen und Originalpfade. Nicht öffentlich teilen, ohne private Pfade zu entfernen.
+
+Tests starten:
+
+```bash
+python3 -m unittest discover -s tests -v
+```
+
+## Später Rust ergänzen
+
+Die Oberfläche ruft klar getrennte Kernfunktionen auf. Das Backup-Manifest verwendet JSON mit `format` und `version`. Ein Rust-Modul oder ein Rust-Kommandozeilenprogramm kann später diese Funktionen ersetzen, während die Qt-Oberfläche erhalten bleibt. Dafür definieren wir bei der Migration eine versionierte JSON-Schnittstelle; Python-Dataclasses selbst sind keine sprachunabhängige Schnittstelle.
+
+Qt-Referenz für die verwendeten Hintergrundaufgaben: https://doc.qt.io/qtforpython-6/PySide6/QtCore/QThread.html
