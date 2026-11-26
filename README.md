@@ -44,6 +44,16 @@ Während eines Vorgangs kann das Fenster erst nach Abschluss geschlossen werden.
 
 Beim ersten Start erscheint „Sorry nur Ki Slop“. Die Einblendung lässt sich sofort über **Schließen** entfernen und blockiert keine Funktionen. Nach dem Schließen erscheint sie für diesen Benutzer nicht erneut; die Auswahl liegt unter `~/.config/mysavebackup/first-start-dismissed`.
 
+## Spielcover
+
+Nach der Spielsuche lädt die App die Cover automatisch im Hintergrund. Verwendet werden Steams öffentliche Bildserver (`shared.fastly.steamstatic.com`), die auch SteamDB für Bilder einbindet. SteamDB selbst wird nicht automatisiert ausgelesen; [SteamDB verweist dafür auf Steam](https://steamdb.info/faq/#does-steamdb-have-an-api).
+
+Bereits von Steam lokal gespeicherte Cover werden ebenfalls erkannt und ohne Download verwendet. Geladene Cover werden unter `~/.cache/mysavebackup/covers` gespeichert (bei gesetztem `XDG_CACHE_HOME` entsprechend dort) und beim nächsten Start ohne erneuten Download angezeigt. Bei fehlender Internetverbindung bleiben bereits gespeicherte Cover sichtbar. Fehlende Bilder erhalten einen Platzhalter; die App bleibt bedienbar. Wenn das Hochformat-Cover fehlt, wird ein Steam-Headerbild versucht.
+
+Fehlt eine Zuordnung oder ist sie falsch, Spiel auswählen und **Cover zuordnen** anklicken. Dort die Steam-App-ID oder den SteamDB-Link des Spiels eintragen. Die Zuordnung liegt unter `~/.config/mysavebackup/cover-ids.json` und verändert keine Spielstandpfade. Spiele ohne Steam-Eintrag oder ohne bereitgestelltes Bild behalten einen Platzhalter.
+
+An den Bildserver wird nur die jeweilige App-ID im Bildpfad gesendet, keine Spielstände oder lokalen Pfade. Cover und deren Cache werden nicht in Spielstand-Backups aufgenommen. Cover bleiben Eigentum der jeweiligen Rechteinhaber.
+
 ## Was schon funktioniert
 
 - Steam-Bibliotheken, einschließlich zusätzlicher Laufwerke und Flatpak, lesen.
@@ -89,6 +99,13 @@ Qt-Referenz für die verwendeten Hintergrundaufgaben: https://doc.qt.io/qtforpyt
 ```text
 MySaveBackup – Änderungsverlauf
 Neueste Änderungen zuerst. Datumsangaben: Europe/Vienna.
+
+2026-11-26 – Spielcover
+- Spieleliste um Cover erweitert, die automatisch im Hintergrund von Steams Bildservern geladen werden (derselben Bildquelle wie bei SteamDB).
+- Vorhandene Bilder aus Steams lokalem Bibliothekscache werden ebenfalls erkannt.
+- Lokaler Cover-Cache für spätere und Offline-Starts; begrenzte parallele Downloads, Zeitlimit und Ersatzbild bei fehlenden Covern.
+- „Cover zuordnen“ akzeptiert eine Steam-App-ID oder einen SteamDB-Spiellink, ohne Spielstandpfade zu ändern.
+- Cover-Downloads und Cache bleiben getrennt von Spielständen und Backups.
 
 2026-11-26 – Spielstandpfade direkt öffnen
 - Ein einzelner Klick auf einen Spielstandpfad in der aufgeklappten Spieleliste öffnet den Ordner im Dateimanager.

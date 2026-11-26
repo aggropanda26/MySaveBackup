@@ -1,11 +1,14 @@
 from pathlib import Path
 import json
-from PySide6.QtCore import Qt, QThread, Signal, Slot, QUrl
-from PySide6.QtGui import QDesktopServices
+import os
+import re
+from PySide6.QtCore import Qt, QThread, Signal, Slot, QUrl, QSize
+from PySide6.QtGui import QDesktopServices, QIcon, QPixmap, QPainter, QColor
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
     QHBoxLayout, QLabel, QPushButton, QLineEdit, QFileDialog, QTreeWidget,
     QTreeWidgetItem, QMessageBox, QProgressBar, QPlainTextEdit, QInputDialog)
 from .core import Game, discover, backup, inspect_backup
+from .covers import CoverLoader, cover_app_id, valid_app_id
 
 PROJECT = Path(__file__).resolve().parent.parent
 
@@ -32,6 +35,22 @@ class Window(QMainWindow):
         self.first_start_marker = self.config/'first-start-dismissed'
         self.manual_file = self.config/'manual-sources.json'
         self.mode = ''
+        self.cover_overrides_file = self.config/'cover-ids.json'
+        try:
+            self.cover_overrides = json.loads(self.cover_overrides_file.read_text())
+            if not isinstance(self.cover_overrides, dict): self.cover_overrides = {}
+        except (OSError, ValueError):
+            self.cover_overrides = {}
+        cache = (self.config/'cache' if config_dir is not None else
+                 Path(os.environ.get('XDG_CACHE_HOME') or Path.home()/'.cache')/'mysavebackup')
+        self.cover_loader = CoverLoader(cache/'covers', self)
+        self.cover_loader.ready.connect(self.cover_ready)
+        self.cover_loader.unavailable.connect(self.cover_unavailable)
+        self.cover_items = {}
+        placeholder = QPixmap(56, 84); placeholder.fill(QColor('#27354a'))
+        painter = QPainter(placeholder); painter.setPen(QColor('#b8c9e0'))
+        painter.drawText(placeholder.rect(), Qt.AlignmentFlag.AlignCenter, 'Kein\nCover'); painter.end()
+        self.cover_placeholder = QIcon(placeholder)
         body = QWidget(); self.setCentralWidget(body); layout = QVBoxLayout(body)
         title = QLabel('MySaveBackup'); title.setStyleSheet('font-size: 28px; font-weight: 700;')
         layout.addWidget(title)
@@ -49,9 +68,11 @@ class Window(QMainWindow):
         self.scan_button = QPushButton('Spiele suchen'); self.scan_button.clicked.connect(self.scan); bar.addWidget(self.scan_button)
         self.manual_button = QPushButton('Spielstandordner hinzufügen'); self.manual_button.clicked.connect(self.add_manual); bar.addWidget(self.manual_button)
         self.open_source_button = QPushButton('Originalordner öffnen'); self.open_source_button.clicked.connect(self.open_source); bar.addWidget(self.open_source_button)
+        self.assign_cover_button = QPushButton('Cover zuordnen'); self.assign_cover_button.clicked.connect(self.assign_cover); bar.addWidget(self.assign_cover_button)
         bar.addStretch()
         self.search = QLineEdit(); self.search.setPlaceholderText('Spiele filtern …'); self.search.textChanged.connect(self.filter); layout.addWidget(self.search)
         self.tree = QTreeWidget(); self.tree.setHeaderLabels(['Spiel / Spielstandordner', 'Status'])
+        self.tree.setIconSize(QSize(56, 84))
         self.tree.itemClicked.connect(self.open_clicked_source)
         self.tree.setColumnWidth(0, 730); self.tree.setRootIsDecorated(True); layout.addWidget(self.tree, 1)
         target = QHBoxLayout(); layout.addLayout(target)
@@ -79,7 +100,7 @@ class Window(QMainWindow):
             self.log.appendPlainText('Der Hinweis wurde geschlossen, konnte aber nicht dauerhaft ausgeblendet werden.')
 
     def busy(self, value):
-        for widget in (self.scan_button,self.manual_button,self.backup_button,self.verify_button,self.browse_button,self.destination,self.tree):
+        for widget in (self.scan_button,self.manual_button,self.backup_button,self.verify_button,self.browse_button,self.assign_cover_button,self.destination,self.tree):
             widget.setEnabled(not value)
         self.progress.setRange(0,0 if value else 1)
         if not value: self.progress.setValue(1)
@@ -143,12 +164,20 @@ class Window(QMainWindow):
         self.start('scan',work)
 
     def populate(self):
+        self.cover_items = {}
         self.tree.clear()
         for g in self.games:
             item = QTreeWidgetItem([g.name, f'{len(g.sources)} Speicherorte' if g.sources else 'Kein lokaler Spielstand erkannt'])
             item.setData(0,Qt.ItemDataRole.UserRole,g)
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
             item.setCheckState(0,Qt.CheckState.Checked if g.sources else Qt.CheckState.Unchecked)
+            item.setIcon(0, self.cover_placeholder)
+            app_id = cover_app_id(g, self.cover_overrides)
+            if app_id:
+                item.setToolTip(0, f'Cover wird im Hintergrund geladen · Steam-App {app_id}')
+                self.cover_items.setdefault(app_id, []).append(item)
+            else:
+                item.setToolTip(0, 'Keine Steam-App-ID bekannt. Über „Cover zuordnen“ ergänzen.')
             self.tree.addTopLevelItem(item)
             for source in g.sources:
                 child = QTreeWidgetItem([str(source),'Original · nur lesen'])
@@ -157,6 +186,50 @@ class Window(QMainWindow):
                 font = child.font(0); font.setUnderline(True); child.setFont(0, font)
                 item.addChild(child)
         self.filter(self.search.text())
+        for app_id in self.cover_items:
+            self.cover_loader.request(app_id)
+
+    def cover_ready(self, app_id, image):
+        icon = QIcon(QPixmap.fromImage(image))
+        for item in self.cover_items.get(app_id, []):
+            item.setIcon(0, icon)
+            item.setToolTip(0, f'Cover von Steam · App {app_id}')
+
+    def cover_unavailable(self, app_id):
+        for item in self.cover_items.get(app_id, []):
+            item.setToolTip(0, f'Cover momentan nicht verfügbar · Steam-App {app_id}. Bei der nächsten App-Sitzung wird erneut versucht.')
+
+    def assign_cover(self):
+        item = self.tree.currentItem()
+        if item is None:
+            self.status.setText('Bitte zuerst ein Spiel auswählen.'); return
+        if item.parent() is not None: item = item.parent()
+        game = item.data(0, Qt.ItemDataRole.UserRole)
+        value, ok = QInputDialog.getText(self, 'Cover zuordnen',
+            'Steam-App-ID oder SteamDB-Link zum Spiel:',
+            text=cover_app_id(game, self.cover_overrides))
+        if not ok: return
+        value = value.strip()
+        match = re.fullmatch(r'https://(?:steamdb.info|store.steampowered.com)/app/([0-9]+)(?:/[^?#]*)?(?:[?#].*)?', value)
+        app_id = match.group(1) if match else value
+        if not valid_app_id(app_id):
+            QMessageBox.information(self, 'Ungültige App-ID', 'Bitte eine numerische Steam-App-ID oder einen SteamDB-Spiellink eingeben.'); return
+        try:
+            self.config.mkdir(parents=True, exist_ok=True)
+            overrides = dict(self.cover_overrides); overrides[game.name] = app_id
+            temporary = self.cover_overrides_file.with_suffix('.tmp')
+            temporary.write_text(json.dumps(overrides, ensure_ascii=False, indent=2))
+            temporary.replace(self.cover_overrides_file)
+            self.cover_overrides = overrides
+            self.cover_loader.failed.discard(app_id)
+            # Update only this item's artwork; preserve checkboxes, expansion and selection.
+            for key in list(self.cover_items):
+                self.cover_items[key] = [entry for entry in self.cover_items[key] if entry is not item]
+            self.cover_items.setdefault(app_id, []).append(item)
+            item.setIcon(0, self.cover_placeholder)
+            self.cover_loader.request(app_id)
+        except OSError as exc:
+            self.failed(str(exc))
 
     def filter(self, text):
         for i in range(self.tree.topLevelItemCount()):
@@ -230,7 +303,9 @@ class Window(QMainWindow):
         if self.worker is not None:
             QMessageBox.information(self,'Vorgang läuft','Bitte warte, bis die laufende Suche oder Sicherung abgeschlossen ist.')
             event.ignore()
-        else:event.accept()
+        else:
+            self.cover_loader.close()
+            event.accept()
 
 def main():
     app=QApplication([]); app.setApplicationName('MySaveBackup')
