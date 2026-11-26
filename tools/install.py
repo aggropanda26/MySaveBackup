@@ -36,7 +36,7 @@ def install(source, home):
     if desktop.exists() and 'X-MySaveBackup-Managed=true' not in desktop.read_text():
         raise RuntimeError(f'Vorhandener Menüeintrag wird nicht überschrieben: {desktop}')
     # Validate input before creating or updating anything.
-    for name in ('mysavebackup/__main__.py', 'mysavebackup/gui.py', 'assets/icon.svg'):
+    for name in ('mysavebackup/__main__.py', 'mysavebackup/gui.py', 'assets/icon.svg', 'CHANGELOG.txt'):
         if not (source / name).is_file():
             raise RuntimeError(f'Projektdatei fehlt: {name}')
     app.mkdir(parents=True, exist_ok=True)
@@ -44,6 +44,7 @@ def install(source, home):
     shutil.copytree(source/'mysavebackup', app/'mysavebackup', dirs_exist_ok=True,
                     ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
     shutil.copy2(source/'assets/icon.svg', icon)
+    shutil.copy2(source/'CHANGELOG.txt', app/'CHANGELOG.txt')
     if (source/'local_sources.json').is_file():
         shutil.copy2(source/'local_sources.json', app/'local_sources.json')
         (app/'local_sources.json').chmod(0o600)

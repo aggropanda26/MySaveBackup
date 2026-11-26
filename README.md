@@ -76,3 +76,33 @@ python3 -m unittest discover -s tests -v
 Die Oberfläche ruft klar getrennte Kernfunktionen auf. Das Backup-Manifest verwendet JSON mit `format` und `version`. Ein Rust-Modul oder ein Rust-Kommandozeilenprogramm kann später diese Funktionen ersetzen, während die Qt-Oberfläche erhalten bleibt. Dafür definieren wir bei der Migration eine versionierte JSON-Schnittstelle; Python-Dataclasses selbst sind keine sprachunabhängige Schnittstelle.
 
 Qt-Referenz für die verwendeten Hintergrundaufgaben: https://doc.qt.io/qtforpython-6/PySide6/QtCore/QThread.html
+
+## Änderungsverlauf
+
+`CHANGELOG.txt` wird bei jeder Installation und Aktualisierung nach `~/.local/share/mysavebackup/CHANGELOG.txt` kopiert. Sie ist die gemeinsame Quelle für den folgenden Verlauf. Nach Änderungen `python3 tools/sync_changelog.py` ausführen; `--check` prüft die Übereinstimmung ohne Dateien zu ändern.
+
+<!-- CHANGELOG:START -->
+```text
+MySaveBackup – Änderungsverlauf
+Neueste Änderungen zuerst. Datumsangaben: Europe/Vienna.
+
+2026-11-26 – Änderungsverlauf
+- CHANGELOG.txt als gemeinsame Quelle für den Änderungsverlauf ergänzt.
+- Installer liefert den aktuellen Verlauf bei Installation und Update mit.
+- README zeigt denselben Verlauf; Synchronisierung und Tests prüfen die Übereinstimmung.
+- Projektregel: Änderungen künftig immer im Änderungsverlauf dokumentieren.
+
+2026-11-26 – Benutzerinstallation
+- install.sh installiert die App ohne sudo und ohne Downloads für den eigenen Benutzer.
+- Startbefehl mysavebackup, Anwendungsmenü-Eintrag und Icon ergänzt.
+- Erneutes Installieren aktualisiert die App und erhält Einstellungen und Backups.
+- Installations-, Update- und Starttests ergänzt; fremde Installationsziele werden abgelehnt.
+
+2026-11-26 – Erste Version 0.1.0
+- Python-/PySide6-Oberfläche mit Spieleliste, Ordnerauswahl und Hintergrundaufgaben erstellt.
+- Steam-Bibliotheken, bekannte Spielstandpfade und manuell ergänzte Ordner unterstützt.
+- Backups nach Spiel und Speicherort mit SHA-256-Prüfung und Herkunftsmanifest erstellt.
+- Verknüpfungen zu Originalordnern und eine reine Duplikatvorschau ergänzt.
+- Originalspielstände werden beim Sichern nur gelesen. Automatische Bereinigung und Wiederherstellung sind noch nicht enthalten.
+```
+<!-- CHANGELOG:END -->

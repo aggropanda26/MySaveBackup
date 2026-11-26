@@ -16,6 +16,7 @@ class InstallerTests(unittest.TestCase):
             shutil.copytree(Path(__file__).resolve().parents[1]/'mysavebackup',source/'mysavebackup')
             shutil.copytree(Path(__file__).resolve().parents[1]/'assets',source/'assets')
             (source/'local_sources.json').write_text('[]')
+            (source/'CHANGELOG.txt').write_text('Erste Installation\n')
             home=base/'User with spaces';home.mkdir()
             app=installer.install(source,home)
             binary=home/'.local/bin/mysavebackup';desktop=home/'.local/share/applications/mysavebackup.desktop'
@@ -24,11 +25,14 @@ class InstallerTests(unittest.TestCase):
             if shutil.which('desktop-file-validate'):
                 subprocess.run(['desktop-file-validate',str(desktop)],check=True)
             self.assertEqual((app/'local_sources.json').read_text(),'[]')
+            self.assertEqual((app/'CHANGELOG.txt').read_text(), 'Erste Installation\n')
+            (source/'CHANGELOG.txt').write_text('Aktualisierte Version\n')
             # Updating preserves user config and backup contents.
             config=home/'.config/mysavebackup';config.mkdir(parents=True)
             (config/'manual-sources.json').write_text('[]')
             backup=home/'Backups';backup.mkdir();(backup/'slot.sav').write_text('saved')
             installer.install(source,home)
+            self.assertEqual((app/'CHANGELOG.txt').read_text(), 'Aktualisierte Version\n')
             self.assertEqual((backup/'slot.sav').read_text(),'saved')
             self.assertEqual((config/'manual-sources.json').read_text(),'[]')
             env=dict(os.environ,QT_QPA_PLATFORM='offscreen',HOME=str(home))
