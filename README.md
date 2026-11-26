@@ -6,6 +6,32 @@ Die App wurde mit KI erstellt.
 
 Eine erste Desktop-App für Spielstand-Backups unter Arch Linux. Python erledigt die Dateiarbeit, PySide6 stellt die Oberfläche bereit.
 
+## Direkt von GitHub installieren oder aktualisieren (Arch Linux)
+
+Einmalig die benötigten Pakete installieren:
+
+```bash
+sudo pacman -S --needed git github-cli python python-pyside6
+```
+
+Das Repository ist privat. Melde dich einmalig mit einem GitHub-Konto an, das Zugriff auf `aggropanda26/MySaveBackup` hat:
+
+```bash
+gh auth login --hostname github.com --git-protocol https --web
+```
+
+Danach installiert dieser Befehl den aktuellen Stand von `main`. Derselbe Befehl aktualisiert eine vorhandene Installation; die App vorher schließen:
+
+```bash
+bash -c 'set -e; msb_tmp=$(mktemp -d); cleanup() { rm -rf -- "$msb_tmp"; }; trap cleanup EXIT; gh repo clone https://github.com/aggropanda26/MySaveBackup.git "$msb_tmp/repo" -- --depth 1 --branch main; bash "$msb_tmp/repo/install.sh"'
+```
+
+Der Befehl lädt das Repository in einen temporären Ordner, führt den vorhandenen Benutzer-Installer aus und entfernt danach nur diesen temporären Download. Die App erscheint im Anwendungsmenü und startet auch über `~/.local/bin/mysavebackup`. Einstellungen und vorhandene Backups bleiben erhalten. Spielstände und lokale Pfadlisten werden nicht aus GitHub geladen; auf einem neuen Rechner zuerst **Spiele suchen** verwenden und fehlende Ordner ergänzen.
+
+Nur die Paketinstallation benötigt sudo. Den Installationsbefehl selbst als normaler Benutzer ausführen. Ohne Repository-Zugriff bricht der Download ab, bevor der Installer startet. Ein öffentlicher Download ohne Anmeldung ist bei diesem privaten Repository nicht möglich.
+
+GitHub-Dokumentation: [Anmeldung](https://cli.github.com/manual/gh_auth_login) und [Repository klonen](https://cli.github.com/manual/gh_repo_clone).
+
 ## Für deinen Benutzer installieren
 
 Im Projektordner ausführen:
@@ -116,6 +142,11 @@ Qt-Referenz für die verwendeten Hintergrundaufgaben: https://doc.qt.io/qtforpyt
 ```text
 MySaveBackup – Änderungsverlauf
 Neueste Änderungen zuerst. Datumsangaben: Europe/Vienna.
+
+2026-11-26 – Installation direkt von GitHub
+- Kopierbaren Installations- und Aktualisierungsbefehl für Arch Linux in der README ergänzt.
+- Einmalige Paketinstallation und GitHub-Anmeldung für das private Repository beschrieben.
+- Temporären Download verwenden; vorhandene Projektordner, Einstellungen und Backups erhalten.
 
 2026-11-26 – Wiederherstellung und Rücknahme
 - Einzelne Spiele aus vollständigen MySaveBackup-Sicherungen wiederherstellen, mit Dateivorschau und ausdrücklicher Bestätigung.
