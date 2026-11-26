@@ -143,11 +143,6 @@ Qt-Referenz für die verwendeten Hintergrundaufgaben: https://doc.qt.io/qtforpyt
 MySaveBackup – Änderungsverlauf
 Neueste Änderungen zuerst. Datumsangaben: Europe/Vienna.
 
-2026-11-26 – Installation direkt von GitHub
-- Kopierbaren Installations- und Aktualisierungsbefehl für Arch Linux in der README ergänzt.
-- Einmalige Paketinstallation und GitHub-Anmeldung für das private Repository beschrieben.
-- Temporären Download verwenden; vorhandene Projektordner, Einstellungen und Backups erhalten.
-
 2026-11-26 – Wiederherstellung und Rücknahme
 - Einzelne Spiele aus vollständigen MySaveBackup-Sicherungen wiederherstellen, mit Dateivorschau und ausdrücklicher Bestätigung.
 - Aktuelle Spielstände vor Änderungen vollständig kopieren und per Prüfsumme verifizieren; Sicherheitskopien unter Vor-Wiederherstellung ablegen.
