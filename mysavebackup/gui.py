@@ -2,12 +2,13 @@ from pathlib import Path
 import json
 import os
 import re
-from PySide6.QtCore import Qt, QThread, Signal, Slot, QUrl, QSize
+from PySide6.QtCore import Qt, QThread, Signal, Slot, QUrl, QSize, QTimer
 from PySide6.QtGui import QDesktopServices, QIcon, QPixmap, QPainter, QColor
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
     QHBoxLayout, QLabel, QPushButton, QLineEdit, QFileDialog, QTreeWidget,
-    QTreeWidgetItem, QMessageBox, QProgressBar, QPlainTextEdit, QInputDialog)
+    QTreeWidgetItem, QMessageBox, QProgressBar, QPlainTextEdit, QInputDialog, QDialog, QDialogButtonBox, QCheckBox)
 from .core import Game, discover, backup, inspect_backup
+from .restore import backup_games, prepare_restore, prepare_undo, execute_restore, plain_path
 from .covers import CoverLoader, cover_app_id, valid_app_id
 
 PROJECT = Path(__file__).resolve().parent.parent
@@ -25,6 +26,26 @@ class Worker(QThread):
         except Exception as exc:
             self.failed.emit(str(exc))
 
+class RestoreDialog(QDialog):
+    def __init__(self, plan, recovery_root, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle('Wiederherstellung prüfen'); self.resize(850, 520)
+        layout = QVBoxLayout(self)
+        title = QLabel(f'{plan.game}: {len(plan.changes)} Dateien werden geändert.'); title.setTextFormat(Qt.TextFormat.PlainText); layout.addWidget(title)
+        listing = QPlainTextEdit(); listing.setReadOnly(True)
+        listing.setPlainText('\n\n'.join(f'{c.action}: {c.target}\nQuelle: {c.payload or "Kein vorheriger Spielstand vorhanden"}' for c in plan.changes))
+        layout.addWidget(listing)
+        note = QLabel(f'Vorherige Spielstände werden zuerst geprüft gesichert unter:\n{recovery_root}\nAndere Dateien bleiben erhalten. Steam Cloud kann wiederhergestellte Stände später ersetzen.')
+        note.setTextFormat(Qt.TextFormat.PlainText); note.setWordWrap(True); layout.addWidget(note)
+        self.confirmation = QCheckBox('Spiel und Launcher sind geschlossen. Ich bestätige die angezeigten Änderungen.')
+        layout.addWidget(self.confirmation)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Cancel)
+        self.apply_button = buttons.addButton('Jetzt wiederherstellen', QDialogButtonBox.ButtonRole.AcceptRole)
+        self.apply_button.setEnabled(False); self.apply_button.setAutoDefault(False)
+        buttons.button(QDialogButtonBox.StandardButton.Cancel).setDefault(True)
+        self.confirmation.toggled.connect(self.apply_button.setEnabled)
+        buttons.accepted.connect(self.accept); buttons.rejected.connect(self.reject); layout.addWidget(buttons)
+
 class Window(QMainWindow):
     def __init__(self, config_dir=None):
         super().__init__()
@@ -38,6 +59,8 @@ class Window(QMainWindow):
         self.first_start_marker = self.config/'first-start-dismissed'
         self.manual_file = self.config/'manual-sources.json'
         self.mode = ''
+        self.pending_plan = None
+        self.last_recovery = None
         self.cover_overrides_file = self.config/'cover-ids.json'
         try:
             self.cover_overrides = json.loads(self.cover_overrides_file.read_text())
@@ -87,10 +110,13 @@ class Window(QMainWindow):
         self.backup_button = QPushButton('Ausgewählte Spiele sichern'); self.backup_button.clicked.connect(self.make_backup); actions.addWidget(self.backup_button)
         self.verify_button = QPushButton('Backup und Duplikate prüfen'); self.verify_button.clicked.connect(self.verify); actions.addWidget(self.verify_button)
         self.open_backup_button = QPushButton('Letztes Backup öffnen'); self.open_backup_button.clicked.connect(self.open_backup); self.open_backup_button.setEnabled(False); actions.addWidget(self.open_backup_button)
+        restore_actions = QHBoxLayout(); layout.addLayout(restore_actions)
+        self.restore_button = QPushButton('Backup wiederherstellen'); self.restore_button.clicked.connect(self.restore_backup); restore_actions.addWidget(self.restore_button)
+        self.undo_button = QPushButton('Wiederherstellung rückgängig'); self.undo_button.clicked.connect(self.undo_restore); restore_actions.addWidget(self.undo_button)
         self.status = QLabel('Bereit. Klicke auf „Spiele suchen“.'); layout.addWidget(self.status)
         self.progress = QProgressBar(); self.progress.setRange(0,1); self.progress.setValue(0); layout.addWidget(self.progress)
         self.log = QPlainTextEdit(); self.log.setReadOnly(True); self.log.setMaximumHeight(165); layout.addWidget(self.log)
-        footer = QLabel('Version 0.1 · Originale werden nur gelesen. Duplikatprüfung zeigt eine Vorschau und löscht nichts.')
+        footer = QLabel('Version 0.1 · Sichern liest Originale nur. Wiederherstellen ändert sie nach Bestätigung. Duplikatprüfung löscht nichts.')
         footer.setWordWrap(True); layout.addWidget(footer)
 
     def dismiss_first_start(self):
@@ -103,7 +129,7 @@ class Window(QMainWindow):
             self.log.appendPlainText('Der Hinweis wurde geschlossen, konnte aber nicht dauerhaft ausgeblendet werden.')
 
     def busy(self, value):
-        for widget in (self.scan_button,self.manual_button,self.backup_button,self.verify_button,self.browse_button,self.assign_cover_button,self.destination,self.tree):
+        for widget in (self.restore_button,self.undo_button,self.scan_button,self.manual_button,self.backup_button,self.verify_button,self.browse_button,self.assign_cover_button,self.destination,self.tree):
             widget.setEnabled(not value)
         self.progress.setRange(0,0 if value else 1)
         if not value: self.progress.setValue(1)
@@ -126,6 +152,9 @@ class Window(QMainWindow):
         old = self.worker; self.worker = None
         self.busy(False)
         if old: old.deleteLater()
+        if self.pending_plan is not None:
+            plan = self.pending_plan; self.pending_plan = None
+            QTimer.singleShot(0, lambda: self.confirm_restore(plan))
 
     @Slot(str)
     def failed(self, message):
@@ -144,6 +173,12 @@ class Window(QMainWindow):
             self.last_backup = Path(result); self.open_backup_button.setEnabled(True)
             self.status.setText('Backup erstellt und alle Kopien geprüft.')
             self.log.appendPlainText(f'Gesichert: {result}')
+        elif self.mode == 'prepare_restore':
+            self.pending_plan = result
+        elif self.mode == 'restore':
+            self.last_recovery = Path(result['recovery'])
+            self.status.setText(f"{result['files']} Dateien für {result['game']} wiederhergestellt.")
+            self.log.appendPlainText(f"Sicherheitskopie für Rücknahme: {result['recovery']}")
         else:
             self.status.setText(f"{result['files']} Dateien · {len(result['duplicates'])} identische Duplikate · {len(result['errors'])} Prüffehler")
             self.log.appendPlainText('Backup-Status: '+result['status'])
@@ -183,7 +218,7 @@ class Window(QMainWindow):
                 item.setToolTip(0, 'Keine Steam-App-ID bekannt. Über „Cover zuordnen“ ergänzen.')
             self.tree.addTopLevelItem(item)
             for source in g.sources:
-                child = QTreeWidgetItem([str(source),'Original · nur lesen'])
+                child = QTreeWidgetItem([str(source),'Originalpfad'])
                 child.setData(0,Qt.ItemDataRole.UserRole,str(source))
                 child.setToolTip(0, 'Einmal klicken, um diesen Ordner im Dateimanager zu öffnen.')
                 font = child.font(0); font.setUnderline(True); child.setFont(0, font)
@@ -259,6 +294,44 @@ class Window(QMainWindow):
     def verify(self):
         folder=QFileDialog.getExistingDirectory(self,'Backup-Ordner mit manifest.json wählen',str(self.last_backup or self.destination.text()))
         if folder: self.start('verify',lambda progress:inspect_backup(Path(folder)))
+
+    def known_sources(self, name):
+        sources = [p for g in self.games if g.name == name for p in g.sources]
+        for file in (PROJECT/'local_sources.json', self.manual_file):
+            if file.exists():
+                for row in json.loads(file.read_text()):
+                    if row['name'] == name: sources.extend(Path(p) for p in row['sources'])
+        return list(dict.fromkeys(sources))
+
+    def restore_backup(self):
+        folder = QFileDialog.getExistingDirectory(self, 'Backup-Ordner mit manifest.json wählen', str(self.last_backup or self.destination.text()))
+        if not folder: return
+        try:
+            names = backup_games(folder)
+            if not names: raise ValueError('Diese Sicherung enthält keine Spielstände.')
+            name, ok = QInputDialog.getItem(self, 'Spiel wiederherstellen', 'Spiel auswählen:', names, 0, False)
+            if not ok: return
+            sources = self.known_sources(name)
+            self.start('prepare_restore', lambda progress: prepare_restore(folder, name, sources))
+        except Exception as exc: self.failed(str(exc))
+
+    def undo_restore(self):
+        folder = QFileDialog.getExistingDirectory(self, 'Sicherheitskopie mit recovery.json wählen', str(self.last_recovery or Path(self.destination.text())/'Vor-Wiederherstellung'))
+        if not folder: return
+        try:
+            journal = json.loads(plain_path(Path(folder)/'recovery.json').read_text())
+            sources = self.known_sources(journal['game'])
+            self.start('prepare_restore', lambda progress: prepare_undo(folder, sources))
+        except Exception as exc: self.failed(str(exc))
+
+    def confirm_restore(self, plan):
+        if not plan.changes:
+            self.status.setText('Keine Änderungen nötig: Dateien entsprechen bereits dem gewünschten Stand.'); return
+        recovery_root = Path(self.destination.text()).expanduser().absolute()/'Vor-Wiederherstellung'
+        dialog = RestoreDialog(plan, recovery_root, self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self.start('restore', lambda progress: execute_restore(plan, recovery_root, progress))
+        else: self.status.setText('Wiederherstellung abgebrochen. Keine Spielstände verändert.')
 
     def open_backup(self):
         if self.last_backup: QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.last_backup)))

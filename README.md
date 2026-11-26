@@ -46,6 +46,19 @@ Während eines Vorgangs kann das Fenster erst nach Abschluss geschlossen werden.
 
 Beim ersten Start erscheint „Sorry nur Ki Slop“. Die Einblendung lässt sich sofort über **Schließen** entfernen und blockiert keine Funktionen. Nach dem Schließen erscheint sie für diesen Benutzer nicht erneut; die Auswahl liegt unter `~/.config/mysavebackup/first-start-dismissed`.
 
+## Spielstände wiederherstellen
+
+1. **Spiele suchen** ausführen, damit die lokalen Speicherorte bekannt sind.
+2. **Backup wiederherstellen** anklicken, einen vollständigen MySaveBackup-Ordner mit `manifest.json` und das Spiel auswählen.
+3. Die Vorschau zeigt jede zu ersetzende oder neu anzulegende Datei mit Originalpfad. Identische Dateien werden ausgelassen; zusätzliche Originaldateien bleiben erhalten.
+4. Spiel und Launcher schließen, die Änderungen ausdrücklich bestätigen und **Jetzt wiederherstellen** anklicken. Steam Cloud kann beim nächsten Start einen anderen Stand synchronisieren.
+
+Vor der ersten Änderung kopiert und prüft die App alle betroffenen vorhandenen Spielstände. Die Sicherheitskopie liegt im eingestellten Backup-Ziel unter `Vor-Wiederherstellung/<Zeitstempel-ID>`; der genaue Pfad erscheint im Protokoll. Fehlende oder beschädigte Backup-Dateien sowie unbekannte Zielpfade werden abgelehnt. Für nicht erkannte Spiele den Originalordner unter demselben Spielnamen manuell ergänzen. Alte Sicherungen ohne MySaveBackup-Manifest werden nicht unterstützt.
+
+Über **Wiederherstellung rückgängig** den Sicherheitskopie-Ordner mit `recovery.json` auswählen und die Vorschau bestätigen. Dabei werden zuvor vorhandene Dateien zurückkopiert und nur durch diese Wiederherstellung neu angelegte Dateien entfernt. Auch die Rücknahme erstellt zuerst eine Sicherheitskopie. Wurden Spielstände inzwischen weiter verändert, bricht die Rücknahme ab, damit neuer Fortschritt erhalten bleibt.
+
+Dateien werden einzeln ersetzt. Ein Fehler oder Abbruch kann deshalb einen teilweise wiederhergestellten Stand hinterlassen. Der gemeldete Sicherheitskopie-Ordner ermöglicht die Rücknahme bereits ausgeführter Änderungen. Sicherheitskopien bis zur erfolgreichen Prüfung im Spiel aufbewahren. Die App prüft Dateiinhalte per SHA-256; ob ein Spiel den Stand inhaltlich laden kann, muss im Spiel geprüft werden.
+
 ## Spielcover
 
 Nach der Spielsuche lädt die App die Cover automatisch im Hintergrund. Verwendet werden Steams öffentliche Bildserver (`shared.fastly.steamstatic.com`), die auch SteamDB für Bilder einbindet. SteamDB selbst wird nicht automatisiert ausgelesen; [SteamDB verweist dafür auf Steam](https://steamdb.info/faq/#does-steamdb-have-an-api).
@@ -65,6 +78,7 @@ An den Bildserver wird nur die jeweilige App-ID im Bildpfad gesendet, keine Spie
 - SHA-256-Prüfsummen prüfen, Originalpfade im Manifest dokumentieren.
 - Originalordner-Verknüpfungen erstellen; Quellen beim Sichern nur lesen.
 - Byte-identische Duplikate innerhalb eines Spiels anzeigen.
+- Spielstände mit Dateivorschau, Bestätigung und geprüfter Sicherheitskopie wiederherstellen und die Wiederherstellung rückgängig machen.
 
 ## Grenzen dieser ersten Version
 
@@ -72,12 +86,13 @@ Die automatische Suche erkennt noch nicht jedes Spiel oder jeden Launcher. Die m
 
 Symbolische Links innerhalb der Quellordner werden nicht verfolgt. Die Original-Verknüpfungen im Backup führen dagegen zu den echten Ordnern: Änderungen über den Dateimanager wirken dort auf die Originale.
 
-Eine automatische Bereinigung und Wiederherstellung sind noch nicht eingebaut. Bei Fehlern bleibt eine als `incomplete` markierte Sicherung zur Diagnose erhalten. Nur `status: complete` bestätigt einen erfolgreichen Durchlauf. Backups auf derselben Festplatte schützen nicht vor deren Ausfall.
+Eine automatische Bereinigung ist noch nicht eingebaut. Bei Fehlern bleibt eine als `incomplete` markierte Sicherung zur Diagnose erhalten. Nur `status: complete` bestätigt einen erfolgreichen Durchlauf. Backups auf derselben Festplatte schützen nicht vor deren Ausfall.
 
 ## Projekt verstehen
 
 - `mysavebackup/gui.py`: Fenster, Schaltflächen, Hintergrundaufgaben.
 - `mysavebackup/core.py`: Suche, Kopieren, Prüfsummen und Duplikatprüfung; ohne Qt-Abhängigkeit.
+- `mysavebackup/restore.py`: Wiederherstellung, Sicherheitskopien und Rücknahme; ohne Qt-Abhängigkeit.
 - `tests/test_core.py`: Tests mit künstlichen Spielständen, ohne Änderungen an echten Spielständen.
 - `local_sources.json`: lokale Spielnamen und Originalpfade. Nicht öffentlich teilen, ohne private Pfade zu entfernen.
 
@@ -101,6 +116,13 @@ Qt-Referenz für die verwendeten Hintergrundaufgaben: https://doc.qt.io/qtforpyt
 ```text
 MySaveBackup – Änderungsverlauf
 Neueste Änderungen zuerst. Datumsangaben: Europe/Vienna.
+
+2026-11-26 – Wiederherstellung und Rücknahme
+- Einzelne Spiele aus vollständigen MySaveBackup-Sicherungen wiederherstellen, mit Dateivorschau und ausdrücklicher Bestätigung.
+- Aktuelle Spielstände vor Änderungen vollständig kopieren und per Prüfsumme verifizieren; Sicherheitskopien unter Vor-Wiederherstellung ablegen.
+- Wiederherstellungen rückgängig machen; seitdem veränderte Spielstände vor unbeabsichtigtem Überschreiben schützen.
+- Beschädigte Sicherungen, unbekannte Ziele und symbolische Links ablehnen; zusätzliche Originaldateien erhalten.
+- Fehlerfälle, Rücknahme und GUI-Ablauf mit künstlichen Spielständen testen.
 
 2026-11-26 – Transparentes App-Icon
 - Schachbrett-Hintergrund der neuen Neon-Panda-Vorlage entfernt und durch echte PNG-Transparenz ersetzt.

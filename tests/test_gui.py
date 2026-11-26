@@ -83,3 +83,36 @@ class GuiTests(unittest.TestCase):
                 opened.reset_mock();window.open_source_path(root/'missing')
                 opened.assert_not_called()
             window.close()
+
+    def test_restore_confirmation_required_and_cancel_no_write(self):
+        from mysavebackup.gui import RestoreDialog
+        from mysavebackup.restore import prepare_restore
+        from mysavebackup.core import backup
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);source=root/'saves';source.mkdir();slot=source/'slot.sav';slot.write_text('old')
+            folder=backup([Game('Test',[source])],root/'backups',lambda _:None);slot.write_text('new')
+            plan=prepare_restore(folder,'Test',[source]);window=Window(config_dir=root/'config')
+            dialog=RestoreDialog(plan,root/'recovery',window)
+            self.assertFalse(dialog.apply_button.isEnabled())
+            dialog.confirmation.setChecked(True);self.assertTrue(dialog.apply_button.isEnabled())
+            dialog.reject()
+            with patch('mysavebackup.gui.RestoreDialog.exec',return_value=0),patch('mysavebackup.gui.execute_restore') as execute:
+                window.confirm_restore(plan);execute.assert_not_called()
+            self.assertEqual(slot.read_text(),'new');window.close()
+
+    def test_restore_preview_worker_then_execution(self):
+        from mysavebackup.restore import prepare_restore
+        from mysavebackup.core import backup
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);source=root/'saves';source.mkdir();slot=source/'slot.sav';slot.write_text('old')
+            folder=backup([Game('Test',[source])],root/'backups',lambda _:None);slot.write_text('new')
+            window=Window(config_dir=root/'config');window.destination.setText(str(root/'backups'))
+            with patch('mysavebackup.gui.RestoreDialog.exec',return_value=1):
+                window.start('prepare_restore',lambda _:prepare_restore(folder,'Test',[source]))
+                import time
+                deadline=time.monotonic()+5
+                while window.last_recovery is None and time.monotonic()<deadline:
+                    self.app.processEvents();QTest.qWait(10)
+                self.app.processEvents()
+            self.assertIsNotNone(window.last_recovery);self.assertIsNone(window.worker)
+            self.assertEqual(slot.read_text(),'old');window.close()
