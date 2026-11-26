@@ -2,7 +2,27 @@
 
 Eine erste Desktop-App für Spielstand-Backups unter Arch Linux. Python erledigt die Dateiarbeit, PySide6 stellt die Oberfläche bereit.
 
-## Starten
+## Für deinen Benutzer installieren
+
+Im Projektordner ausführen:
+
+```bash
+./install.sh
+```
+
+Die Installation braucht kein sudo und lädt nichts herunter. Falls PySide6 fehlt, zuerst `sudo pacman -S python python-pyside6` ausführen. Danach findest du **MySaveBackup** im Anwendungsmenü.
+
+Direkt starten:
+
+```bash
+~/.local/bin/mysavebackup
+```
+
+Wenn `~/.local/bin` in deinem PATH steht, reicht `mysavebackup`. Der Installer ändert keine Shell-Konfiguration.
+
+Die Anwendung liegt unter `~/.local/share/mysavebackup`, der Menüeintrag unter `~/.local/share/applications/mysavebackup.desktop`. Die lokale Spielekonfiguration wird, sofern vorhanden, mitkopiert. Eigene Quellen unter `~/.config/mysavebackup` und vorhandene Backups bleiben erhalten. Nach Quellcode-Änderungen die App schließen und `./install.sh` erneut ausführen, um die installierte Kopie zu aktualisieren.
+
+## Ohne Installation aus dem Projekt starten
 
 Im Projektordner ein Terminal öffnen und ausführen:
 
