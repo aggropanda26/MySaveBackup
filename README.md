@@ -35,7 +35,7 @@ Im Projektordner ein Terminal öffnen und ausführen:
 Beim ersten Start entsteht eine lokale Python-Umgebung in `.venv`. Auf diesem Rechner ist PySide6 bereits vorhanden. Auf einem anderen Arch-Rechner werden `python` und `python-pyside6` benötigt. Es werden beim Start keine Pakete heruntergeladen.
 
 1. **Spiele suchen** anklicken.
-2. Spiele aufklappen und gefundene Speicherorte prüfen. Spiele ohne erkannte Dateien können über **Spielstandordner hinzufügen** ergänzt werden.
+2. Spiele aufklappen und gefundene Speicherorte prüfen. Ein einzelner Klick auf einen unterstrichenen Spielstandpfad öffnet dessen Ordner direkt im Dateimanager. Spiele ohne erkannte Dateien können über **Spielstandordner hinzufügen** ergänzt werden.
 3. Zielordner auswählen und **Ausgewählte Spiele sichern** anklicken. Die Auswahl bleibt beim Filtern bestehen.
 4. **Letztes Backup öffnen** öffnet die geprüfte Sicherung.
 5. **Backup und Duplikate prüfen** liest einen Sicherungsordner mit `manifest.json`. Diese erste Version zeigt Duplikate nur an und löscht nichts.
@@ -89,6 +89,10 @@ Qt-Referenz für die verwendeten Hintergrundaufgaben: https://doc.qt.io/qtforpyt
 ```text
 MySaveBackup – Änderungsverlauf
 Neueste Änderungen zuerst. Datumsangaben: Europe/Vienna.
+
+2026-11-26 – Spielstandpfade direkt öffnen
+- Ein einzelner Klick auf einen Spielstandpfad in der aufgeklappten Spieleliste öffnet den Ordner im Dateimanager.
+- Bei einzelnen Spielstanddateien wird deren übergeordneter Ordner geöffnet; fehlende Speicherorte werden angezeigt.
 
 2026-11-26 – Hinweis beim ersten Start
 - Sofort schließbare Einblendung „Sorry nur Ki Slop“ ergänzt, ohne Wartezeit oder Sperre der Oberfläche.

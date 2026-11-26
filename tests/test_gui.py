@@ -4,6 +4,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 from pathlib import Path
+from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QEventLoop, QTimer, Qt
 from mysavebackup.gui import Window
@@ -52,4 +53,33 @@ class GuiTests(unittest.TestCase):
                 window.dismiss_first_start_button.click()
             self.assertFalse(window.first_start_banner.isVisible())
             self.assertTrue(window.scan_button.isEnabled())
+            window.close()
+
+    def test_single_click_on_source_opens_folder(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp); source=root/'Save Games'; source.mkdir()
+            window=Window(config_dir=root/'config')
+            window.games=[Game('Test',[source])];window.populate();window.show()
+            game=window.tree.topLevelItem(0);game.setExpanded(True)
+            self.app.processEvents()
+            with patch('mysavebackup.gui.QDesktopServices.openUrl', return_value=True) as opened:
+                QTest.mouseClick(window.tree.viewport(), Qt.MouseButton.LeftButton,
+                                 pos=window.tree.visualItemRect(game.child(0)).center())
+                self.assertEqual(opened.call_count,1)
+                self.assertEqual(opened.call_args.args[0].toLocalFile(),str(source))
+                opened.reset_mock()
+                QTest.mouseClick(window.tree.viewport(), Qt.MouseButton.LeftButton,
+                                 pos=window.tree.visualItemRect(game).center())
+                opened.assert_not_called()
+            window.close()
+
+    def test_file_source_opens_parent_and_missing_source_does_not_open(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp); file=root/'slot.sav';file.write_text('save')
+            window=Window(config_dir=root/'config')
+            with patch('mysavebackup.gui.QDesktopServices.openUrl', return_value=True) as opened:
+                window.open_source_path(file)
+                self.assertEqual(opened.call_args.args[0].toLocalFile(),str(root))
+                opened.reset_mock();window.open_source_path(root/'missing')
+                opened.assert_not_called()
             window.close()

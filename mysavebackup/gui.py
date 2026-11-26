@@ -52,6 +52,7 @@ class Window(QMainWindow):
         bar.addStretch()
         self.search = QLineEdit(); self.search.setPlaceholderText('Spiele filtern …'); self.search.textChanged.connect(self.filter); layout.addWidget(self.search)
         self.tree = QTreeWidget(); self.tree.setHeaderLabels(['Spiel / Spielstandordner', 'Status'])
+        self.tree.itemClicked.connect(self.open_clicked_source)
         self.tree.setColumnWidth(0, 730); self.tree.setRootIsDecorated(True); layout.addWidget(self.tree, 1)
         target = QHBoxLayout(); layout.addLayout(target)
         target.addWidget(QLabel('Backup-Ziel:'))
@@ -151,7 +152,10 @@ class Window(QMainWindow):
             self.tree.addTopLevelItem(item)
             for source in g.sources:
                 child = QTreeWidgetItem([str(source),'Original · nur lesen'])
-                child.setData(0,Qt.ItemDataRole.UserRole,str(source)); item.addChild(child)
+                child.setData(0,Qt.ItemDataRole.UserRole,str(source))
+                child.setToolTip(0, 'Einmal klicken, um diesen Ordner im Dateimanager zu öffnen.')
+                font = child.font(0); font.setUnderline(True); child.setFont(0, font)
+                item.addChild(child)
         self.filter(self.search.text())
 
     def filter(self, text):
@@ -183,6 +187,19 @@ class Window(QMainWindow):
     def open_backup(self):
         if self.last_backup: QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.last_backup)))
 
+    def open_clicked_source(self, item, column):
+        value = item.data(0, Qt.ItemDataRole.UserRole)
+        if column == 0 and isinstance(value, str):
+            self.open_source_path(Path(value))
+
+    def open_source_path(self, path):
+        if not path.exists():
+            self.status.setText(f'Ordner nicht verfügbar: {path}')
+            return
+        folder = path if path.is_dir() else path.parent
+        if not QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder))):
+            self.status.setText(f'Dateimanager konnte nicht geöffnet werden: {folder}')
+
     def open_source(self):
         item=self.tree.currentItem()
         if not item:return
@@ -193,7 +210,7 @@ class Window(QMainWindow):
                 self.status.setText('Wähle unter dem Spiel den gewünschten Originalordner aus.');return
             path=value.sources[0]
         else:path=Path(value)
-        QDesktopServices.openUrl(QUrl.fromLocalFile(str(path if path.is_dir() else path.parent)))
+        self.open_source_path(path)
 
     def add_manual(self):
         name,ok=QInputDialog.getText(self,'Spiel hinzufügen','Name des Spiels:')

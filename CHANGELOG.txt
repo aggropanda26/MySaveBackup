@@ -1,6 +1,10 @@
 MySaveBackup – Änderungsverlauf
 Neueste Änderungen zuerst. Datumsangaben: Europe/Vienna.
 
+2026-11-26 – Spielstandpfade direkt öffnen
+- Ein einzelner Klick auf einen Spielstandpfad in der aufgeklappten Spieleliste öffnet den Ordner im Dateimanager.
+- Bei einzelnen Spielstanddateien wird deren übergeordneter Ordner geöffnet; fehlende Speicherorte werden angezeigt.
+
 2026-11-26 – Hinweis beim ersten Start
 - Sofort schließbare Einblendung „Sorry nur Ki Slop“ ergänzt, ohne Wartezeit oder Sperre der Oberfläche.
 - Nach dem Schließen wird der Hinweis für diesen Benutzer dauerhaft ausgeblendet, auch nach App-Updates.
