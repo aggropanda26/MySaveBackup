@@ -1,6 +1,13 @@
 MySaveBackup – Änderungsverlauf
 Neueste Änderungen zuerst. Datumsangaben: Europe/Vienna.
 
+2026-11-27 – Direkte OneDrive-Anbindung
+- Persönliche Microsoft-Konten im Browser verbinden; Anmeldung mit MSAL/PKCE und Token-Speicherung ausschließlich im Linux-Schlüsselbund.
+- Geprüfte Backups nach Bestätigung als ZIP in den eigenen OneDrive-App-Ordner hochladen; Fortschritt, Abbruch und begrenzte Wiederholungen bei Netzwerkfehlern ergänzen.
+- Cloud-Backups auflisten, herunterladen und vor der bestehenden Wiederherstellung auf sichere Pfade und Prüfsummen prüfen.
+- Lokale Verbindung trennen, ohne Cloud-Backups zu löschen; keine Originalordner-Verknüpfungen oder zusätzlichen Dateien hochladen.
+- Optionalen Installer-Schalter --with-onedrive für isolierte Python-Abhängigkeiten ergänzen; Einrichtung und Grenzen dokumentieren.
+
 2026-11-26 – Anleitung für das öffentliche Repository
 - Installation und Updates per git clone ohne GitHub-Anmeldung oder GitHub CLI beschrieben.
 - Rechnerbezogene Hinweise korrigiert und lokale Spielstandkonfiguration als optional und nicht mitgeliefert gekennzeichnet.

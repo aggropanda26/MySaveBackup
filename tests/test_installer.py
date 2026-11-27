@@ -60,3 +60,21 @@ class InstallerTests(unittest.TestCase):
             self.assertEqual(list(target.iterdir()),[])
 
 if __name__=='__main__':unittest.main()
+
+class CloudInstallerTests(unittest.TestCase):
+    def test_optional_cloud_setup_and_reuse(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as d:
+            app=Path(d)
+            with patch('venv.EnvBuilder') as builder,patch('subprocess.run') as run:
+                def create(path):
+                    (path/'bin').mkdir(parents=True);(path/'bin/python').touch()
+                builder.return_value.create.side_effect=create
+                run.return_value.returncode=0
+                interpreter=installer.cloud_python(app,True)
+                self.assertEqual(interpreter,app/'cloud-venv/bin/python')
+                self.assertTrue(any('pip' in call.args[0] for call in run.call_args_list))
+                builder.reset_mock();run.reset_mock()
+                self.assertEqual(installer.cloud_python(app,False),interpreter)
+                builder.assert_not_called()
+                self.assertFalse(any('pip' in call.args[0] for call in run.call_args_list))

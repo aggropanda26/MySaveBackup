@@ -26,6 +26,36 @@ Der Befehl lädt das Repository in einen temporären Ordner, führt den vorhande
 
 Nur die Paketinstallation benötigt sudo. Den Installationsbefehl selbst als normaler Benutzer ausführen. Schlägt der Download fehl, startet der Installer nicht.
 
+## OneDrive direkt verbinden (optional)
+
+MySaveBackup unterstützt persönliche Microsoft-/OneDrive-Konten. Die Anmeldung erfolgt im Systembrowser mit Microsofts MSAL-Bibliothek und PKCE. Ein eigener Cloud-Synchronisationsclient ist nicht nötig. Google Drive, Dropbox und geschäftliche Microsoft-Konten sind in dieser Version noch nicht angebunden.
+
+Im Projektordner installieren oder aktualisieren:
+
+```bash
+./install.sh --with-onedrive
+```
+
+Beim oben gezeigten GitHub-Installationsbefehl entsprechend am Ende `bash "$msb_tmp/repo/install.sh" --with-onedrive` verwenden. Der Zusatz lädt MSAL, keyring, SecretStorage und requests von PyPI in `~/.local/share/mysavebackup/cloud-venv`. System-Python-Pakete werden dabei nicht überschrieben. Die vorhandene Cloud-Umgebung wird bei normalen App-Updates weiterverwendet. Nach einem System-Python-Upgrade bei Bedarf erneut mit `--with-onedrive` installieren.
+
+Für die sichere Anmeldung muss im Desktop ein entsperrbarer Secret-Service-Schlüsselbund laufen, beispielsweise KWallet oder GNOME Keyring. Es gibt keinen Rückfall auf unverschlüsselte Token-Dateien. Ohne Schlüsselbund bleiben lokale Backups nutzbar. Beim Start aus dem Quellcode statt der installierten App die optionalen Pakete in der Projektumgebung installieren: `.venv/bin/python -m pip install '.[onedrive]'` (nach dem ersten `./start.sh`).
+
+1. **Mit OneDrive verbinden** anklicken und im Browser bei Microsoft anmelden. Die Anmeldung endet spätestens nach drei Minuten; ein Browser-Abbruch kann bis dahin auf das Zeitlimit warten. Nach erfolgreicher Anmeldung erscheint das Konto in der App.
+2. **Backup hochladen** wählen, einen vollständigen Backup-Ordner auswählen und die Übertragung bestätigen. Es erfolgt kein automatischer Upload beim lokalen Sichern.
+3. Die App erstellt ein ZIP nur aus den im Manifest aufgeführten, per SHA-256 geprüften Spielstandkopien und dem Manifest. Originalordner-Verknüpfungen und zusätzliche Dateien werden nicht eingepackt. Das Manifest enthält Spielnamen und ursprüngliche lokale Pfade. Das ZIP wird per HTTPS übertragen und ist nicht zusätzlich passwortverschlüsselt.
+4. **Cloud-Backups** listet die von MySaveBackup benannten ZIP-Archive im App-Ordner auf. Ein ausgewähltes Archiv wird in einen neuen lokalen Ordner heruntergeladen, sicher entpackt und geprüft. Danach über **Backup wiederherstellen** die vorhandene Vorschau und Sicherheitskopie verwenden. Ein Download verändert keine Originalspielstände.
+5. **Verbindung trennen** entfernt den lokalen MSAL-Cache aus dem Schlüsselbund. Cloud-Backups bleiben erhalten. Die Microsoft-Zustimmung lässt sich zusätzlich unter [Microsoft-Kontoberechtigungen](https://account.live.com/consent/Manage) widerrufen.
+
+Die Zugriffsrechte sind `Files.ReadWrite.AppFolder` (eigener OneDrive-App-Ordner) und `User.Read` (Profil). Die App registriert sich als öffentlicher Desktop-Client ohne Clientschlüssel; die Client-ID im Quellcode ist öffentlich. OAuth-Tokens liegen ausschließlich im Secret-Service-Schlüsselbund unter `MySaveBackup.OneDrive`. Eine lokale Sperrdatei `~/.config/mysavebackup/onedrive.lock` koordiniert gleichzeitige Anmeldungen und enthält keine Tokens.
+
+Uploads erfolgen in Abschnitten mit Fortschrittsanzeige. Vorübergehende Netzwerk-/Serverfehler werden begrenzt erneut versucht. **Transfer abbrechen** beendet den Vorgang zwischen Dateiblöcken bzw. nach einer laufenden Netzwerkanfrage. Nach einem endgültigen Fehler den Upload erneut starten; eine Wiederaufnahme nach App-Neustart wird noch nicht unterstützt. Ein Fehler während der letzten Serverantwort kann trotz Fehlermeldung bereits einen fertigen Cloud-Eintrag hinterlassen; vor einem erneuten Versuch die Cloud-Liste prüfen. Erfolgreiche Uploads werden anhand der OneDrive-Abschlussantwort und Archivgröße bestätigt; eine vollständige Rückleseprüfung erfolgt beim Download.
+
+Limit dieser Version: höchstens 20 GiB Archivgröße und 20 GiB entpackte Daten, maximal 99.999 Spielstanddateien. Packen und Download benötigen zusätzlichen lokalen Speicher. Lokale Backups bleiben bei Cloud-Fehlern erhalten. Temporäre Archive werden nach Abschluss oder behandelten Fehlern entfernt; nach einem Prozess-/Systemabsturz können temporäre Dateien zurückbleiben.
+
+Entwicklerkonfiguration: Client-ID `3aa3a3de-809e-48ac-8bb3-b6b44d618607`, Kontotyp persönliche Microsoft-Konten, Desktop-Umleitungsadresse `http://localhost`, delegierte Graph-Berechtigungen wie oben. Die Cloud-Tests simulieren Microsoft-Antworten; eine erfolgreiche Anmeldung und Übertragung mit einem echten Konto muss zusätzlich geprüft werden.
+
+Quellen: [MSAL-Anmeldung](https://learn.microsoft.com/en-us/entra/msal/python/getting-started/acquiring-tokens), [OneDrive-App-Ordner](https://learn.microsoft.com/graph/onedrive-sharepoint-appfolder), [Upload-Sitzungen](https://learn.microsoft.com/en-us/graph/api/driveitem-createuploadsession?view=graph-rest-1.0).
+
 ## Für deinen Benutzer installieren
 
 Im Projektordner ausführen:
@@ -34,7 +64,7 @@ Im Projektordner ausführen:
 ./install.sh
 ```
 
-Die Installation braucht kein sudo und lädt nichts herunter. Falls PySide6 fehlt, zuerst `sudo pacman -S python python-pyside6` ausführen. Danach findest du **MySaveBackup** im Anwendungsmenü.
+Die Standardinstallation braucht kein sudo und lädt nichts herunter. Die optionale OneDrive-Installation lädt Python-Abhängigkeiten von PyPI. Falls PySide6 fehlt, zuerst `sudo pacman -S python python-pyside6` ausführen. Danach findest du **MySaveBackup** im Anwendungsmenü.
 
 Direkt starten:
 
@@ -136,6 +166,13 @@ Qt-Referenz für die verwendeten Hintergrundaufgaben: https://doc.qt.io/qtforpyt
 ```text
 MySaveBackup – Änderungsverlauf
 Neueste Änderungen zuerst. Datumsangaben: Europe/Vienna.
+
+2026-11-27 – Direkte OneDrive-Anbindung
+- Persönliche Microsoft-Konten im Browser verbinden; Anmeldung mit MSAL/PKCE und Token-Speicherung ausschließlich im Linux-Schlüsselbund.
+- Geprüfte Backups nach Bestätigung als ZIP in den eigenen OneDrive-App-Ordner hochladen; Fortschritt, Abbruch und begrenzte Wiederholungen bei Netzwerkfehlern ergänzen.
+- Cloud-Backups auflisten, herunterladen und vor der bestehenden Wiederherstellung auf sichere Pfade und Prüfsummen prüfen.
+- Lokale Verbindung trennen, ohne Cloud-Backups zu löschen; keine Originalordner-Verknüpfungen oder zusätzlichen Dateien hochladen.
+- Optionalen Installer-Schalter --with-onedrive für isolierte Python-Abhängigkeiten ergänzen; Einrichtung und Grenzen dokumentieren.
 
 2026-11-26 – Anleitung für das öffentliche Repository
 - Installation und Updates per git clone ohne GitHub-Anmeldung oder GitHub CLI beschrieben.

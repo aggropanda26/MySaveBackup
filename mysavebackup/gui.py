@@ -2,6 +2,7 @@ from pathlib import Path
 import json
 import os
 import re
+from threading import Event
 from PySide6.QtCore import Qt, QThread, Signal, Slot, QUrl, QSize, QTimer
 from PySide6.QtGui import QDesktopServices, QIcon, QPixmap, QPainter, QColor
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
@@ -9,6 +10,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
     QTreeWidgetItem, QMessageBox, QProgressBar, QPlainTextEdit, QInputDialog, QDialog, QDialogButtonBox, QCheckBox)
 from .core import Game, discover, backup, inspect_backup
 from .restore import backup_games, prepare_restore, prepare_undo, execute_restore, plain_path
+from .onedrive import run_cloud
 from .covers import CoverLoader, cover_app_id, valid_app_id
 
 PROJECT = Path(__file__).resolve().parent.parent
@@ -61,6 +63,8 @@ class Window(QMainWindow):
         self.mode = ''
         self.pending_plan = None
         self.last_recovery = None
+        self.pending_cloud_items = None
+        self.cloud_cancel = Event()
         self.cover_overrides_file = self.config/'cover-ids.json'
         try:
             self.cover_overrides = json.loads(self.cover_overrides_file.read_text())
@@ -113,6 +117,13 @@ class Window(QMainWindow):
         restore_actions = QHBoxLayout(); layout.addLayout(restore_actions)
         self.restore_button = QPushButton('Backup wiederherstellen'); self.restore_button.clicked.connect(self.restore_backup); restore_actions.addWidget(self.restore_button)
         self.undo_button = QPushButton('Wiederherstellung rückgängig'); self.undo_button.clicked.connect(self.undo_restore); restore_actions.addWidget(self.undo_button)
+        cloud = QHBoxLayout(); layout.addLayout(cloud)
+        self.cloud_connect = QPushButton('Mit OneDrive verbinden'); self.cloud_connect.clicked.connect(self.connect_cloud); cloud.addWidget(self.cloud_connect)
+        self.cloud_upload = QPushButton('Backup hochladen'); self.cloud_upload.clicked.connect(self.upload_cloud); cloud.addWidget(self.cloud_upload)
+        self.cloud_download = QPushButton('Cloud-Backups'); self.cloud_download.clicked.connect(lambda: self.start_cloud('list')); cloud.addWidget(self.cloud_download)
+        self.cloud_disconnect = QPushButton('Verbindung trennen'); self.cloud_disconnect.clicked.connect(self.disconnect_cloud); cloud.addWidget(self.cloud_disconnect)
+        self.cloud_abort = QPushButton('Transfer abbrechen'); self.cloud_abort.clicked.connect(self.cloud_cancel.set); self.cloud_abort.setEnabled(False); cloud.addWidget(self.cloud_abort)
+        self.cloud_status = QLabel('OneDrive · Noch nicht in dieser Sitzung verbunden'); self.cloud_status.setTextFormat(Qt.TextFormat.PlainText); layout.addWidget(self.cloud_status)
         self.status = QLabel('Bereit. Klicke auf „Spiele suchen“.'); layout.addWidget(self.status)
         self.progress = QProgressBar(); self.progress.setRange(0,1); self.progress.setValue(0); layout.addWidget(self.progress)
         self.log = QPlainTextEdit(); self.log.setReadOnly(True); self.log.setMaximumHeight(165); layout.addWidget(self.log)
@@ -129,10 +140,10 @@ class Window(QMainWindow):
             self.log.appendPlainText('Der Hinweis wurde geschlossen, konnte aber nicht dauerhaft ausgeblendet werden.')
 
     def busy(self, value):
-        for widget in (self.restore_button,self.undo_button,self.scan_button,self.manual_button,self.backup_button,self.verify_button,self.browse_button,self.assign_cover_button,self.destination,self.tree):
+        for widget in (self.cloud_connect,self.cloud_upload,self.cloud_download,self.cloud_disconnect,self.restore_button,self.undo_button,self.scan_button,self.manual_button,self.backup_button,self.verify_button,self.browse_button,self.assign_cover_button,self.destination,self.tree):
             widget.setEnabled(not value)
         self.progress.setRange(0,0 if value else 1)
-        if not value: self.progress.setValue(1)
+        if not value: self.progress.setValue(1); self.cloud_abort.setEnabled(False)
 
     def start(self, mode, operation):
         if self.worker is not None:
@@ -152,6 +163,9 @@ class Window(QMainWindow):
         old = self.worker; self.worker = None
         self.busy(False)
         if old: old.deleteLater()
+        if self.pending_cloud_items is not None:
+            items = self.pending_cloud_items; self.pending_cloud_items = None
+            QTimer.singleShot(0, lambda: self.choose_cloud_download(items))
         if self.pending_plan is not None:
             plan = self.pending_plan; self.pending_plan = None
             QTimer.singleShot(0, lambda: self.confirm_restore(plan))
@@ -164,7 +178,22 @@ class Window(QMainWindow):
 
     @Slot(object)
     def completed(self, result):
-        if self.mode == 'scan':
+        if self.mode == 'cloud_connect':
+            self.cloud_status.setText('OneDrive verbunden: '+result)
+            self.status.setText('Anmeldung im Linux-Schlüsselbund gespeichert.')
+        elif self.mode == 'cloud_disconnect':
+            self.cloud_status.setText('OneDrive · Verbindung getrennt')
+            self.status.setText(result)
+        elif self.mode == 'cloud_list':
+            self.pending_cloud_items = result
+        elif self.mode == 'cloud_upload':
+            self.status.setText('OneDrive hat den Upload bestätigt.')
+            self.log.appendPlainText('Hochgeladen in den OneDrive-App-Ordner: '+result)
+        elif self.mode == 'cloud_download':
+            self.last_backup = Path(result); self.open_backup_button.setEnabled(True)
+            self.status.setText('Cloud-Backup heruntergeladen und geprüft. Wiederherstellung ist jetzt möglich.')
+            self.log.appendPlainText('Heruntergeladen: '+result)
+        elif self.mode == 'scan':
             self.games = result; self.populate()
             ready = sum(bool(g.sources) for g in self.games)
             self.status.setText(f'{len(self.games)} Spiele · {ready} mit gefundenen Spielstanddateien')
@@ -295,6 +324,42 @@ class Window(QMainWindow):
         folder=QFileDialog.getExistingDirectory(self,'Backup-Ordner mit manifest.json wählen',str(self.last_backup or self.destination.text()))
         if folder: self.start('verify',lambda progress:inspect_backup(Path(folder)))
 
+    def start_cloud(self, action, **kwargs):
+        if self.worker is not None: return
+        self.cloud_cancel = Event()
+        self.start('cloud_'+action, lambda progress: run_cloud(self.config, action, progress, self.cloud_cancel, **kwargs))
+        self.cloud_abort.setEnabled(action in ('upload','download','list'))
+
+    def connect_cloud(self):
+        self.start_cloud('connect')
+
+    def disconnect_cloud(self):
+        answer = QMessageBox.question(self, 'OneDrive trennen',
+            'Gespeicherte Anmeldung aus dem Linux-Schlüsselbund entfernen? Cloud-Backups bleiben erhalten. '
+            'Eine erteilte Microsoft-Berechtigung kannst du zusätzlich in deinem Microsoft-Konto widerrufen.',
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
+        if answer == QMessageBox.StandardButton.Yes: self.start_cloud('disconnect')
+
+    def upload_cloud(self):
+        folder = QFileDialog.getExistingDirectory(self, 'Geprüftes Backup mit manifest.json hochladen', str(self.last_backup or self.destination.text()))
+        if not folder: return
+        answer = QMessageBox.question(self, 'Backup zu OneDrive hochladen',
+            f'Dieses Backup zu deinem verbundenen OneDrive-Konto hochladen?\n\n{folder}\n\n'
+            'Übertragen werden Spielstandkopien und das Manifest mit Spielnamen und Originalpfaden. '
+            'Die Dateien werden vor dem Upload geprüft. Das Archiv ist nicht zusätzlich passwortverschlüsselt.',
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
+        if answer == QMessageBox.StandardButton.Yes: self.start_cloud('upload', folder=folder)
+
+    def choose_cloud_download(self, items):
+        if not items:
+            self.status.setText('Keine MySaveBackup-Archive im OneDrive-App-Ordner gefunden.'); return
+        labels = [f"{item['name']} · {item['size']/1024/1024:.1f} MiB" for item in items]
+        selected, ok = QInputDialog.getItem(self, 'OneDrive-Backup herunterladen', 'Backup auswählen:', labels, 0, False)
+        if not ok: return
+        destination = QFileDialog.getExistingDirectory(self, 'Lokalen Zielordner für den Download wählen', self.destination.text())
+        if destination:
+            self.start_cloud('download',item=items[labels.index(selected)],destination=destination)
+
     def known_sources(self, name):
         sources = [p for g in self.games if g.name == name for p in g.sources]
         for file in (PROJECT/'local_sources.json', self.manual_file):
@@ -377,7 +442,7 @@ class Window(QMainWindow):
 
     def closeEvent(self,event):
         if self.worker is not None:
-            QMessageBox.information(self,'Vorgang läuft','Bitte warte, bis die laufende Suche oder Sicherung abgeschlossen ist.')
+            QMessageBox.information(self,'Vorgang läuft','Bitte warte, bis die laufende Vorgang abgeschlossen ist. Bei Cloud-Transfers kannst du „Transfer abbrechen“ verwenden; die Anmeldung endet spätestens nach 3 Minuten.')
             event.ignore()
         else:
             self.cover_loader.close()

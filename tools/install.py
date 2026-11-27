@@ -1,4 +1,4 @@
-"""Install this checkout for the current user without sudo or network access."""
+"""Install this checkout for the current user without sudo; optional OneDrive dependencies are downloaded from PyPI."""
 from pathlib import Path
 import argparse
 import importlib.util
@@ -15,7 +15,28 @@ def desktop_quote(value):
     value = value.replace('\\', '\\\\').replace('"', '\\"').replace('`', '\\`').replace('$', '\\$')
     return '"' + value.replace('%', '%%') + '"'
 
-def install(source, home):
+def cloud_python(app, enabled=False):
+    environment = app/'cloud-venv'
+    interpreter = environment/'bin/python'
+    if environment.is_symlink():
+        raise RuntimeError('Cloud-Python-Umgebung darf keine Verknüpfung sein.')
+    if enabled:
+        import venv
+        print('Installiere optionale OneDrive-Komponenten von PyPI in eine eigene Python-Umgebung …')
+        venv.EnvBuilder(with_pip=True, system_site_packages=True).create(environment)
+        subprocess.run([str(interpreter), '-m', 'pip', 'install',
+                        'msal>=1.31,<2', 'keyring>=25,<26', 'SecretStorage>=3.3,<4',
+                        'requests>=2.32,<3'], check=True)
+    if interpreter.exists():
+        result = subprocess.run([str(interpreter), '-c', 'import PySide6, msal, keyring, secretstorage, requests'],
+                                capture_output=True)
+        if result.returncode:
+            raise RuntimeError('Cloud-Umgebung muss aktualisiert werden: ./install.sh --with-onedrive')
+        return interpreter
+    return Path(sys.executable)
+
+
+def install(source, home, with_onedrive=False):
     if importlib.util.find_spec('PySide6') is None:
         raise RuntimeError('PySide6 fehlt. Bitte zuerst: sudo pacman -S python python-pyside6')
     app = home / '.local/share/mysavebackup'
@@ -51,7 +72,7 @@ def install(source, home):
     if (source/'README.md').is_file():
         shutil.copy2(source/'README.md', app/'README.md')
     binary.parent.mkdir(parents=True, exist_ok=True)
-    python = shlex.quote(sys.executable)
+    python = shlex.quote(str(cloud_python(app, with_onedrive)))
     binary.write_text('#!/usr/bin/env bash\n# MySaveBackup launcher\nset -euo pipefail\n'
                       + 'cd -- ' + shlex.quote(str(app)) + '\n'
                       + 'exec ' + python + ' -m mysavebackup "$@"\n')
@@ -76,12 +97,13 @@ def install(source, home):
 
 def main():
     parser = argparse.ArgumentParser(description='MySaveBackup für den eigenen Benutzer installieren oder aktualisieren.')
-    parser.parse_args()
+    parser.add_argument('--with-onedrive', action='store_true', help='OneDrive-Abhängigkeiten von PyPI in eine isolierte Umgebung installieren.')
+    args = parser.parse_args()
     if os.geteuid() == 0:
         parser.exit(1, 'Bitte ohne sudo als normaler Benutzer starten.\n')
     try:
-        install(Path(__file__).resolve().parents[1], Path.home())
-    except (OSError, RuntimeError) as exc:
+        install(Path(__file__).resolve().parents[1], Path.home(), args.with_onedrive)
+    except (OSError, RuntimeError, subprocess.CalledProcessError) as exc:
         parser.exit(1, f'Installation fehlgeschlagen: {exc}\n')
 
 if __name__ == '__main__':

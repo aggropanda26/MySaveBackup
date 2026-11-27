@@ -116,3 +116,22 @@ class GuiTests(unittest.TestCase):
                 self.app.processEvents()
             self.assertIsNotNone(window.last_recovery);self.assertIsNone(window.worker)
             self.assertEqual(slot.read_text(),'old');window.close()
+
+    def test_cloud_upload_requires_confirmation(self):
+        from PySide6.QtWidgets import QMessageBox
+        with tempfile.TemporaryDirectory() as d:
+            window=Window(config_dir=Path(d)/'config')
+            with patch('mysavebackup.gui.QFileDialog.getExistingDirectory',return_value=d),patch('mysavebackup.gui.QMessageBox.question',return_value=QMessageBox.StandardButton.No),patch.object(window,'start_cloud') as start:
+                window.upload_cloud();start.assert_not_called()
+            window.close()
+
+    def test_cloud_connect_runs_in_background(self):
+        with tempfile.TemporaryDirectory() as d:
+            window=Window(config_dir=Path(d)/'config')
+            with patch('mysavebackup.gui.run_cloud',return_value='Testkonto'):
+                window.connect_cloud()
+                self.assertFalse(window.cloud_upload.isEnabled())
+                loop=QEventLoop();window.worker.finished.connect(loop.quit)
+                QTimer.singleShot(5000,loop.quit);loop.exec()
+            self.assertIn('Testkonto',window.cloud_status.text())
+            self.assertTrue(window.cloud_upload.isEnabled());window.close()
