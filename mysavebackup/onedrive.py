@@ -11,7 +11,7 @@ import tempfile
 import time
 import uuid
 import zipfile
-from urllib.parse import quote, urlparse
+from urllib.parse import quote, urlparse, urljoin
 from .restore import load_manifest, inside, plain_path
 
 CLIENT_ID = '3aa3a3de-809e-48ac-8bb3-b6b44d618607'
@@ -266,7 +266,7 @@ class Graph:
         name = 'MySaveBackup_'+time.strftime('%Y-%m-%d_%H-%M-%S')+'_'+uuid.uuid4().hex+'.zip'
         size = Path(archive).stat().st_size
         session = self.json('POST', f'/me/drive/items/{folder}:/{name}:/createUploadSession',
-                            json={'item':{'name':name,'@microsoft.graph.conflictBehavior':'fail'}})
+                            json={'item':{'@microsoft.graph.conflictBehavior':'fail'}})
         url = session['uploadUrl']
         parsed = urlparse(url)
         if parsed.scheme != 'https' or not parsed.hostname or parsed.username or parsed.password:
@@ -310,7 +310,17 @@ class Graph:
             if response.status_code != 302:
                 raise CloudError('OneDrive hat keine Download-Adresse geliefert.')
             url = response.headers['Location']
-        with self.request('GET',url,authenticated=False,stream=True) as response:
+        # Personal OneDrive may redirect again through its download CDN.
+        # Every hop is HTTPS and carries no Graph Authorization header.
+        for hop in range(6):
+            response = self.request('GET',url,authenticated=False,stream=True)
+            if response.status_code not in (301,302,303,307,308): break
+            location = response.headers.get('Location')
+            response.close()
+            if not location or hop == 5:
+                raise CloudError('Zu viele oder ungültige OneDrive-Downloadweiterleitungen.')
+            url = urljoin(url, location)
+        with response:
             if response.status_code != 200: raise CloudError('Cloud-Download konnte nicht gestartet werden.')
             total = 0
             with Path(archive).open('wb') as out:

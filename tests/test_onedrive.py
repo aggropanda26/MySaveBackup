@@ -79,6 +79,8 @@ class GraphTests(unittest.TestCase):
             result=Graph('secret',session=session).upload(p)
         self.assertEqual(result['id'],'file')
         calls=session.request.call_args_list
+        self.assertEqual(calls[1].kwargs['json'], {'item': {'@microsoft.graph.conflictBehavior': 'fail'}})
+        self.assertIn('MySaveBackup_', calls[1].args[1])
         self.assertEqual(calls[0].kwargs['headers']['Authorization'],'Bearer secret')
         for call in calls[2:]:self.assertNotIn('Authorization',call.kwargs['headers'])
         self.assertEqual(calls[2].kwargs['headers']['Content-Range'],f'bytes 0-{CHUNK-1}/{size}')
@@ -106,12 +108,13 @@ class GraphTests(unittest.TestCase):
             with self.assertRaises(CloudError) as cm:run_cloud('/unused','connect')
         self.assertNotIn('secret-token',str(cm.exception))
     def test_download_does_not_forward_auth(self):
-        session=Mock();session.request.side_effect=[Response(302,headers={'Location':'https://download.example/private'}),Response(content=b'abc')]
+        session=Mock();session.request.side_effect=[Response(302,headers={'Location':'https://download.example/private'}),Response(302,headers={'Location':'https://cdn.example/file'}),Response(content=b'abc')]
         graph=Graph('secret',session=session)
         with tempfile.TemporaryDirectory() as d,patch.object(graph,'listing',return_value=[{'id':'item'}]):
             p=Path(d)/'archive';graph.download({'id':'item','size':3},p)
             self.assertEqual(p.read_bytes(),b'abc')
-        self.assertNotIn('Authorization',session.request.call_args_list[-1].kwargs['headers'])
+        for call in session.request.call_args_list[1:]:
+            self.assertNotIn('Authorization',call.kwargs['headers'])
 
 class AuthTests(unittest.TestCase):
     def test_success_saved_in_vault_and_login_scopes(self):

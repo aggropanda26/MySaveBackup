@@ -52,7 +52,7 @@ Uploads erfolgen in Abschnitten mit Fortschrittsanzeige. Vorübergehende Netzwer
 
 Limit dieser Version: höchstens 20 GiB Archivgröße und 20 GiB entpackte Daten, maximal 99.999 Spielstanddateien. Packen und Download benötigen zusätzlichen lokalen Speicher. Lokale Backups bleiben bei Cloud-Fehlern erhalten. Temporäre Archive werden nach Abschluss oder behandelten Fehlern entfernt; nach einem Prozess-/Systemabsturz können temporäre Dateien zurückbleiben.
 
-Entwicklerkonfiguration: Client-ID `3aa3a3de-809e-48ac-8bb3-b6b44d618607`, Kontotyp persönliche Microsoft-Konten, Desktop-Umleitungsadresse `http://localhost`, delegierte Graph-Berechtigungen wie oben. Die Cloud-Tests simulieren Microsoft-Antworten; eine erfolgreiche Anmeldung und Übertragung mit einem echten Konto muss zusätzlich geprüft werden.
+Entwicklerkonfiguration: Client-ID `3aa3a3de-809e-48ac-8bb3-b6b44d618607`, Kontotyp persönliche Microsoft-Konten, Desktop-Umleitungsadresse `http://localhost`, delegierte Graph-Berechtigungen wie oben. Automatisierte Cloud-Tests simulieren Microsoft-Antworten. Am 27.11.2026 wurden Upload, Auflistung und Download mit SHA-256-Prüfung zusätzlich mit einem echten persönlichen OneDrive-Konto und künstlichen Testdaten erfolgreich geprüft.
 
 Quellen: [MSAL-Anmeldung](https://learn.microsoft.com/en-us/entra/msal/python/getting-started/acquiring-tokens), [OneDrive-App-Ordner](https://learn.microsoft.com/graph/onedrive-sharepoint-appfolder), [Upload-Sitzungen](https://learn.microsoft.com/en-us/graph/api/driveitem-createuploadsession?view=graph-rest-1.0).
 
@@ -166,6 +166,12 @@ Qt-Referenz für die verwendeten Hintergrundaufgaben: https://doc.qt.io/qtforpyt
 ```text
 MySaveBackup – Änderungsverlauf
 Neueste Änderungen zuerst. Datumsangaben: Europe/Vienna.
+
+2026-11-27 – OneDrive-Uploadfehler behoben
+- Upload-Sitzung ohne redundanten Dateinamen im Anfragekörper erstellen; die bisherige Kombination führte beim getesteten persönlichen OneDrive-Konto zu HTTP 400.
+- Eindeutigen Dateinamen im Zielpfad und Schutz vor Überschreiben beibehalten; Regressionstest ergänzt.
+- Zusätzliche HTTPS-Weiterleitungen beim OneDrive-Download ohne Weitergabe des Anmeldungstokens unterstützen.
+- Upload, Auflistung und Download mit Prüfsummenvergleich im echten OneDrive-Konto mit künstlichen Daten erfolgreich geprüft; Testdateien anschließend entfernt.
 
 2026-11-27 – Direkte OneDrive-Anbindung
 - Persönliche Microsoft-Konten im Browser verbinden; Anmeldung mit MSAL/PKCE und Token-Speicherung ausschließlich im Linux-Schlüsselbund.
